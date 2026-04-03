@@ -253,6 +253,36 @@ export class Ynab implements INodeType {
 					},
 				},
 			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['plan'],
+						operation: ['get'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
 
 			// Account Operations
 			{
