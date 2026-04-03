@@ -64,7 +64,7 @@ The n8n-nodes-YNAB project **meets all n8n community node requirements** and is 
 | Operations | ✅ PASS | 15+ operations across 6 resources |
 
 **Resources Implemented**:
-1. Budget (Get All, Get Single, Get Settings)
+1. Plan (Get All, Get Single, Get Settings)
 2. Account (Get All, Get Single, Create)
 3. Transaction (Get All, Get Single, Create, Update, Delete)
 4. Category (Get All, Get Single)

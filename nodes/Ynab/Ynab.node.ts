@@ -46,8 +46,8 @@ export class Ynab implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
-						name: 'Budget',
-						value: 'budget',
+						name: 'Plan',
+						value: 'plan',
 					},
 					{
 						name: 'Account',
@@ -70,10 +70,10 @@ export class Ynab implements INodeType {
 						value: 'user',
 					},
 				],
-				default: 'budget',
+				default: 'plan',
 			},
 
-			// Budget Operations
+			// Plan Operations
 			{
 				displayName: 'Operation',
 				name: 'operation',
@@ -81,26 +81,26 @@ export class Ynab implements INodeType {
 				noDataExpression: true,
 				displayOptions: {
 					show: {
-						resource: ['budget'],
+						resource: ['plan'],
 					},
 				},
 				options: [
 					{
 						name: 'Get All',
 						value: 'getAll',
-						description: 'Get all budgets',
-						action: 'Get all budgets',
+						description: 'Get all plans',
+						action: 'Get all plans',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '/budgets',
+								url: '/plans',
 							},
 							output: {
 								postReceive: [
 									{
 										type: 'rootProperty',
 										properties: {
-											property: 'data.budgets',
+											property: 'data.plans',
 										},
 									},
 								],
@@ -110,19 +110,19 @@ export class Ynab implements INodeType {
 					{
 						name: 'Get',
 						value: 'get',
-						description: 'Get a single budget',
-						action: 'Get a budget',
+						description: 'Get a single plan',
+						action: 'Get a plan',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}',
+								url: '=/plans/{{$parameter.planId}}',
 							},
 							output: {
 								postReceive: [
 									{
 										type: 'rootProperty',
 										properties: {
-											property: 'data.budget',
+											property: 'data.plan',
 										},
 									},
 								],
@@ -132,12 +132,12 @@ export class Ynab implements INodeType {
 					{
 						name: 'Get Settings',
 						value: 'getSettings',
-						description: 'Get budget settings',
-						action: 'Get budget settings',
+						description: 'Get plan settings',
+						action: 'Get plan settings',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/settings',
+								url: '=/plans/{{$parameter.planId}}/settings',
 							},
 							output: {
 								postReceive: [
@@ -155,18 +155,18 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
+				displayName: 'Plan ID',
+				name: 'planId',
 				type: 'string',
 				required: true,
 				displayOptions: {
 					show: {
-						resource: ['budget'],
+						resource: ['plan'],
 						operation: ['get', 'getSettings'],
 					},
 				},
 				default: '',
-				description: 'The ID of the budget',
+				description: 'The ID of the plan',
 			},
 			{
 				displayName: 'Include Accounts',
@@ -174,12 +174,12 @@ export class Ynab implements INodeType {
 				type: 'boolean',
 				displayOptions: {
 					show: {
-						resource: ['budget'],
+						resource: ['plan'],
 						operation: ['getAll'],
 					},
 				},
 				default: false,
-				description: 'Whether to include the list of budget accounts',
+				description: 'Whether to include the list of plan accounts',
 				routing: {
 					request: {
 						qs: {
@@ -204,12 +204,12 @@ export class Ynab implements INodeType {
 					{
 						name: 'Get All',
 						value: 'getAll',
-						description: 'Get all accounts for a budget',
+						description: 'Get all accounts for a plan',
 						action: 'Get all accounts',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/accounts',
+								url: '=/plans/{{$parameter.planId}}/accounts',
 							},
 							output: {
 								postReceive: [
@@ -231,7 +231,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/accounts/{{$parameter.accountId}}',
+								url: '=/plans/{{$parameter.planId}}/accounts/{{$parameter.accountId}}',
 							},
 							output: {
 								postReceive: [
@@ -253,7 +253,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'POST',
-								url: '=/budgets/{{$parameter.budgetId}}/accounts',
+								url: '=/plans/{{$parameter.planId}}/accounts',
 							},
 							send: {
 								type: 'body',
@@ -293,8 +293,8 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
+				displayName: 'Plan ID',
+				name: 'planId',
 				type: 'string',
 				required: true,
 				displayOptions: {
@@ -303,7 +303,7 @@ export class Ynab implements INodeType {
 					},
 				},
 				default: '',
-				description: 'The ID of the budget',
+				description: 'The ID of the plan',
 			},
 			{
 				displayName: 'Account ID',
@@ -391,7 +391,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions',
+								url: '=/plans/{{$parameter.planId}}/transactions',
 							},
 							output: {
 								postReceive: [
@@ -413,7 +413,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions/{{$parameter.transactionId}}',
+								url: '=/plans/{{$parameter.planId}}/transactions/{{$parameter.transactionId}}',
 							},
 							output: {
 								postReceive: [
@@ -435,7 +435,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'POST',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions',
+								url: '=/plans/{{$parameter.planId}}/transactions',
 							},
 							send: {
 								type: 'body',
@@ -482,7 +482,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'PUT',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions/{{$parameter.transactionId}}',
+								url: '=/plans/{{$parameter.planId}}/transactions/{{$parameter.transactionId}}',
 							},
 							send: {
 								type: 'body',
@@ -529,7 +529,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'DELETE',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions/{{$parameter.transactionId}}',
+								url: '=/plans/{{$parameter.planId}}/transactions/{{$parameter.transactionId}}',
 							},
 							output: {
 								postReceive: [
@@ -547,8 +547,8 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
+				displayName: 'Plan ID',
+				name: 'planId',
 				type: 'string',
 				required: true,
 				displayOptions: {
@@ -557,7 +557,7 @@ export class Ynab implements INodeType {
 					},
 				},
 				default: '',
-				description: 'The ID of the budget',
+				description: 'The ID of the plan',
 			},
 			{
 				displayName: 'Transaction ID',
@@ -680,7 +680,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/categories',
+								url: '=/plans/{{$parameter.planId}}/categories',
 							},
 							output: {
 								postReceive: [
@@ -702,7 +702,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/categories/{{$parameter.categoryId}}',
+								url: '=/plans/{{$parameter.planId}}/categories/{{$parameter.categoryId}}',
 							},
 							output: {
 								postReceive: [
@@ -720,8 +720,8 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
+				displayName: 'Plan ID',
+				name: 'planId',
 				type: 'string',
 				required: true,
 				displayOptions: {
@@ -730,7 +730,7 @@ export class Ynab implements INodeType {
 					},
 				},
 				default: '',
-				description: 'The ID of the budget',
+				description: 'The ID of the plan',
 			},
 			{
 				displayName: 'Category ID',
@@ -767,7 +767,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/payees',
+								url: '=/plans/{{$parameter.planId}}/payees',
 							},
 							output: {
 								postReceive: [
@@ -789,7 +789,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/payees/{{$parameter.payeeId}}',
+								url: '=/plans/{{$parameter.planId}}/payees/{{$parameter.payeeId}}',
 							},
 							output: {
 								postReceive: [
@@ -807,8 +807,8 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
+				displayName: 'Plan ID',
+				name: 'planId',
 				type: 'string',
 				required: true,
 				displayOptions: {
@@ -817,7 +817,7 @@ export class Ynab implements INodeType {
 					},
 				},
 				default: '',
-				description: 'The ID of the budget',
+				description: 'The ID of the plan',
 			},
 			{
 				displayName: 'Payee ID',

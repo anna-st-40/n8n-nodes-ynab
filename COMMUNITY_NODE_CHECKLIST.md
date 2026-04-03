@@ -90,7 +90,7 @@ This checklist verifies if the n8n-nodes-YNAB project meets the requirements for
 - [ ] **Community scanner**: Need to run `npx @n8n/scan-community-package n8n-nodes-ynab`
 
 ### 14. Functionality
-- [x] **6 Resources implemented**: Budget, Account, Transaction, Category, Payee, User
+- [x] **6 Resources implemented**: Plan, Account, Transaction, Category, Payee, User
 - [x] **15+ Operations**: Full CRUD operations
 - [x] **Tested with real API**: Successfully tested with YNAB API
 - [x] **AI Agent compatible**: Declarative style

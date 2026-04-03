@@ -36,7 +36,7 @@ n8n-nodes-ynab/
 ## 🎯 Features Implemented
 
 ### Resources & Operations
-- **Budgets**: Get All, Get Single, Get Settings
+- **Plans**: Get All, Get Single, Get Settings
 - **Accounts**: Get All, Get Single, Create
 - **Transactions**: Get All, Get Single, Create, Update, Delete
 - **Categories**: Get All, Get Single
