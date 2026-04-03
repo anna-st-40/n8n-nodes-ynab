@@ -17,12 +17,12 @@ Get up and running with the YNAB n8n node in minutes!
 
 ## 2. Install the Node
 
-### Option A: Via n8n Community Nodes (Coming Soon)
+### Option A: Via n8n Community Nodes
 
 1. Open n8n
 2. Go to **Settings** > **Community Nodes**
 3. Click **Install**
-4. Enter: `n8n-nodes-ynab`
+4. Enter: `n8n-nodes-ynab-npab19`
 5. Click **Install**
 
 ### Option B: Manual Installation
@@ -77,7 +77,7 @@ Try these common operations:
 ## Need Help?
 
 - 📖 [Full Documentation](README.md)
-- 🐛 [Report Issues](https://github.com/YOUR_USERNAME/n8n-nodes-ynab/issues)
+- 🐛 [Report Issues](https://github.com/Npab19/n8n-nodes-ynab/issues)
 - 💬 [YNAB API Docs](https://api.ynab.com)
 - 🤝 [Contributing Guide](CONTRIBUTING.md)
 
