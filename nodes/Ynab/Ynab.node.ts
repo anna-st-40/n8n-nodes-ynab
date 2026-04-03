@@ -66,8 +66,24 @@ export class Ynab implements INodeType {
 						value: 'payee',
 					},
 					{
+						name: 'Payee Location',
+						value: 'payeeLocation',
+					},
+					{
+						name: 'Month',
+						value: 'month',
+					},
+					{
+						name: 'Money Movement',
+						value: 'moneyMovement',
+					},
+					{
 						name: 'Transaction',
 						value: 'transaction',
+					},
+					{
+						name: 'Scheduled Transaction',
+						value: 'scheduledTransaction',
 					},
 					{
 						name: 'User',
@@ -192,36 +208,6 @@ export class Ynab implements INodeType {
 					},
 				],
 				description: 'Select a plan from the list or enter a plan ID',
-			},
-			{
-				displayName: 'Additional Fields',
-				name: 'additionalFields',
-				type: 'collection',
-				displayOptions: {
-					show: {
-						resource: ['plan'],
-						operation: ['get'],
-					},
-				},
-				default: '',
-				placeholder: 'Add Field',
-				options: [
-					{
-						displayName: 'Last Knowledge of Server',
-						name: 'lastKnowledgeOfServer',
-						type: 'string',
-						default: '',
-						description:
-							'If provided, only entities changed since this server knowledge value are returned',
-						routing: {
-							request: {
-								qs: {
-									last_knowledge_of_server: '={{$value || undefined}}',
-								},
-							},
-						},
-					},
-				],
 			},
 			{
 				displayName: 'Include Accounts',
@@ -1839,6 +1825,883 @@ export class Ynab implements INodeType {
 				},
 				default: '',
 				description: 'The ID of the payee',
+			},
+
+			// Month Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['month'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all plan months',
+						action: 'Get all plan months',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/months',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.months',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get a single plan month',
+						action: 'Get a plan month',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/months/{{$parameter.month}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.month',
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['month'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['month'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Month',
+				name: 'month',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['month'],
+						operation: ['get'],
+					},
+				},
+				default: '',
+				description: 'The plan month in ISO format (YYYY-MM-DD) or current',
+			},
+
+			// Payee Location Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all payee locations',
+						action: 'Get all payee locations',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '={{$parameter.payeeLocationAdditionalFilters && $parameter.payeeLocationAdditionalFilters.payeeId ? "/plans/" + $parameter.planId + "/payees/" + $parameter.payeeLocationAdditionalFilters.payeeId + "/payee_locations" : "/plans/" + $parameter.planId + "/payee_locations"}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.payee_locations',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get a single payee location',
+						action: 'Get a payee location',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/payee_locations/{{$parameter.payeeLocationId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.payee_location',
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Payee Location ID',
+				name: 'payeeLocationId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+						operation: ['get'],
+					},
+				},
+				default: '',
+				description: 'The ID of the payee location',
+			},
+			{
+				displayName: 'Additional Filters',
+				name: 'payeeLocationAdditionalFilters',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Filter',
+				options: [
+					{
+						displayName: 'Payee ID',
+						name: 'payeeId',
+						type: 'string',
+						default: '',
+						description: 'If provided, get payee locations only for this payee',
+					},
+				],
+				description: 'Optionally filter to payee locations for a specific payee',
+			},
+			// Money Movement Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['moneyMovement'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all money movements',
+						action: 'Get all money movements',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '={{$parameter.moneyMovementAdditionalFilters && $parameter.moneyMovementAdditionalFilters.month ? "/plans/" + $parameter.planId + "/months/" + $parameter.moneyMovementAdditionalFilters.month + "/money_movements" : "/plans/" + $parameter.planId + "/money_movements"}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.money_movements',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get All Groups',
+						value: 'getGroups',
+						description: 'Get all money movement groups',
+						action: 'Get all money movement groups',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '={{$parameter.moneyMovementAdditionalFilters && $parameter.moneyMovementAdditionalFilters.month ? "/plans/" + $parameter.planId + "/months/" + $parameter.moneyMovementAdditionalFilters.month + "/money_movement_groups" : "/plans/" + $parameter.planId + "/money_movement_groups"}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.money_movement_groups',
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['moneyMovement'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Additional Filters',
+				name: 'moneyMovementAdditionalFilters',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['moneyMovement'],
+						operation: ['getAll', 'getGroups'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Filter',
+				options: [
+					{
+						displayName: 'Month',
+						name: 'month',
+						type: 'string',
+						default: '',
+						description: 'If provided, only data for this month (YYYY-MM-DD or current) is returned',
+					},
+				],
+				description: 'Optional filters for money movement queries',
+			},
+
+			// Scheduled Transaction Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all scheduled transactions',
+						action: 'Get all scheduled transactions',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.scheduled_transactions',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get a single scheduled transaction',
+						action: 'Get a scheduled transaction',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions/{{$parameter.scheduledTransactionId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.scheduled_transaction',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a scheduled transaction',
+						action: 'Create a scheduled transaction',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions',
+							},
+							send: {
+								type: 'body',
+								property: 'scheduled_transaction',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const scheduledAccountId = String(
+											this.getNodeParameter('scheduledAccountId') || '',
+										).trim();
+										const scheduledDate = String(
+											this.getNodeParameter('scheduledDate') || '',
+										).trim();
+										if (!scheduledAccountId) {
+											throw new NodeOperationError(this.getNode(), 'Account ID is required');
+										}
+										if (!scheduledDate) {
+											throw new NodeOperationError(this.getNode(), 'Date is required');
+										}
+
+										const scheduledAmount = this.getNodeParameter('scheduledAmount', 0) as number;
+										const scheduledPayeeId = String(
+											this.getNodeParameter('scheduledPayeeId', ''),
+										).trim();
+										const scheduledPayeeName = String(
+											this.getNodeParameter('scheduledPayeeName', ''),
+										).trim();
+										const scheduledCategoryId = String(
+											this.getNodeParameter('scheduledCategoryId', ''),
+										).trim();
+										const scheduledMemo = String(
+											this.getNodeParameter('scheduledMemo', ''),
+										).trim();
+										const scheduledFlagColor = String(
+											this.getNodeParameter('scheduledFlagColor', ''),
+										).trim();
+										const scheduledFrequency = String(
+											this.getNodeParameter('scheduledFrequency', ''),
+										).trim();
+
+										const scheduled_transaction: IDataObject = {
+											account_id: scheduledAccountId,
+											date: scheduledDate,
+										};
+
+										if (Number.isFinite(scheduledAmount)) {
+											scheduled_transaction.amount = scheduledAmount;
+										}
+										if (scheduledPayeeId) {
+											scheduled_transaction.payee_id = scheduledPayeeId;
+										}
+										if (scheduledPayeeName) {
+											scheduled_transaction.payee_name = scheduledPayeeName;
+										}
+										if (scheduledCategoryId) {
+											scheduled_transaction.category_id = scheduledCategoryId;
+										}
+										if (scheduledMemo) {
+											scheduled_transaction.memo = scheduledMemo;
+										}
+										if (scheduledFlagColor) {
+											scheduled_transaction.flag_color = scheduledFlagColor;
+										}
+										if (scheduledFrequency) {
+											scheduled_transaction.frequency = scheduledFrequency;
+										}
+
+										return {
+											...requestOptions,
+											body: { scheduled_transaction },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.scheduled_transaction' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update',
+						value: 'update',
+						description: 'Update a scheduled transaction',
+						action: 'Update a scheduled transaction',
+						routing: {
+							request: {
+								method: 'PUT',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions/{{$parameter.scheduledTransactionId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'scheduled_transaction',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const scheduledAccountId = String(
+											this.getNodeParameter('scheduledAccountId') || '',
+										).trim();
+										const scheduledDate = String(
+											this.getNodeParameter('scheduledDate') || '',
+										).trim();
+										if (!scheduledAccountId) {
+											throw new NodeOperationError(this.getNode(), 'Account ID is required');
+										}
+										if (!scheduledDate) {
+											throw new NodeOperationError(this.getNode(), 'Date is required');
+										}
+
+										const scheduledAmount = this.getNodeParameter('scheduledAmount', 0) as number;
+										const scheduledPayeeId = String(
+											this.getNodeParameter('scheduledPayeeId', ''),
+										).trim();
+										const scheduledPayeeName = String(
+											this.getNodeParameter('scheduledPayeeName', ''),
+										).trim();
+										const scheduledCategoryId = String(
+											this.getNodeParameter('scheduledCategoryId', ''),
+										).trim();
+										const scheduledMemo = String(
+											this.getNodeParameter('scheduledMemo', ''),
+										).trim();
+										const scheduledFlagColor = String(
+											this.getNodeParameter('scheduledFlagColor', ''),
+										).trim();
+										const scheduledFrequency = String(
+											this.getNodeParameter('scheduledFrequency', ''),
+										).trim();
+
+										const scheduled_transaction: IDataObject = {
+											account_id: scheduledAccountId,
+											date: scheduledDate,
+										};
+
+										if (Number.isFinite(scheduledAmount)) {
+											scheduled_transaction.amount = scheduledAmount;
+										}
+										if (scheduledPayeeId) {
+											scheduled_transaction.payee_id = scheduledPayeeId;
+										}
+										if (scheduledPayeeName) {
+											scheduled_transaction.payee_name = scheduledPayeeName;
+										}
+										if (scheduledCategoryId) {
+											scheduled_transaction.category_id = scheduledCategoryId;
+										}
+										if (scheduledMemo) {
+											scheduled_transaction.memo = scheduledMemo;
+										}
+										if (scheduledFlagColor) {
+											scheduled_transaction.flag_color = scheduledFlagColor;
+										}
+										if (scheduledFrequency) {
+											scheduled_transaction.frequency = scheduledFrequency;
+										}
+
+										return {
+											...requestOptions,
+											body: { scheduled_transaction },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.scheduled_transaction' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Delete',
+						value: 'delete',
+						description: 'Delete a scheduled transaction',
+						action: 'Delete a scheduled transaction',
+						routing: {
+							request: {
+								method: 'DELETE',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions/{{$parameter.scheduledTransactionId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.scheduled_transaction' },
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Scheduled Transaction ID',
+				name: 'scheduledTransactionId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['get', 'update', 'delete'],
+					},
+				},
+				default: '',
+				description: 'The ID of the scheduled transaction',
+			},
+			{
+				displayName: 'Account ID',
+				name: 'scheduledAccountId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The ID of the account',
+			},
+			{
+				displayName: 'Date',
+				name: 'scheduledDate',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The scheduled transaction date in ISO format (YYYY-MM-DD)',
+			},
+			{
+				displayName: 'Amount',
+				name: 'scheduledAmount',
+				type: 'number',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: 0,
+				description: 'The scheduled transaction amount in milliunits format',
+			},
+			{
+				displayName: 'Payee ID',
+				name: 'scheduledPayeeId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The ID of the payee',
+			},
+			{
+				displayName: 'Payee Name',
+				name: 'scheduledPayeeName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The payee name to use when payee ID is not provided',
+			},
+			{
+				displayName: 'Category ID',
+				name: 'scheduledCategoryId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The ID of the category',
+			},
+			{
+				displayName: 'Memo',
+				name: 'scheduledMemo',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'Scheduled transaction memo',
+			},
+			{
+				displayName: 'Flag Color',
+				name: 'scheduledFlagColor',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				options: [
+					{ name: 'None', value: '' },
+					{ name: 'Red', value: 'red' },
+					{ name: 'Orange', value: 'orange' },
+					{ name: 'Yellow', value: 'yellow' },
+					{ name: 'Green', value: 'green' },
+					{ name: 'Blue', value: 'blue' },
+					{ name: 'Purple', value: 'purple' },
+				],
+				default: '',
+				description: 'Optional flag color for the scheduled transaction',
+			},
+			{
+				displayName: 'Frequency',
+				name: 'scheduledFrequency',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				options: [
+					{ name: 'None', value: '' },
+					{ name: 'Never', value: 'never' },
+					{ name: 'Daily', value: 'daily' },
+					{ name: 'Weekly', value: 'weekly' },
+					{ name: 'Every Other Week', value: 'everyOtherWeek' },
+					{ name: 'Twice A Month', value: 'twiceAMonth' },
+					{ name: 'Every 4 Weeks', value: 'every4Weeks' },
+					{ name: 'Monthly', value: 'monthly' },
+					{ name: 'Every Other Month', value: 'everyOtherMonth' },
+					{ name: 'Every 3 Months', value: 'every3Months' },
+					{ name: 'Every 4 Months', value: 'every4Months' },
+					{ name: 'Twice A Year', value: 'twiceAYear' },
+					{ name: 'Yearly', value: 'yearly' },
+					{ name: 'Every Other Year', value: 'everyOtherYear' },
+				],
+				default: '',
+				description: 'Optional recurrence frequency for the scheduled transaction',
 			},
 
 			// User Operations
