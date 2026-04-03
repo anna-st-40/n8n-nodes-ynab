@@ -54,16 +54,16 @@ export class Ynab implements INodeType {
 						value: 'account',
 					},
 					{
-						name: 'Transaction',
-						value: 'transaction',
-					},
-					{
 						name: 'Category',
 						value: 'category',
 					},
 					{
 						name: 'Payee',
 						value: 'payee',
+					},
+					{
+						name: 'Transaction',
+						value: 'transaction',
 					},
 					{
 						name: 'User',
@@ -167,6 +167,36 @@ export class Ynab implements INodeType {
 				},
 				default: '',
 				description: 'The ID of the plan',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['plan'],
+						operation: ['get'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
 			},
 			{
 				displayName: 'Include Accounts',
@@ -304,6 +334,36 @@ export class Ynab implements INodeType {
 				},
 				default: '',
 				description: 'The ID of the plan',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['account'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
 			},
 			{
 				displayName: 'Account ID',
@@ -445,15 +505,28 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
+										const payeeName = (
+											this.getNodeParameter('payeeName') as string
+										).trim();
+										const memo = (this.getNodeParameter('memo') as string).trim();
+
+										const transaction: IDataObject = {
+											account_id: this.getNodeParameter('accountId') as string,
+											date: this.getNodeParameter('date') as string,
+											amount: this.getNodeParameter('amount') as number,
+											cleared: this.getNodeParameter('cleared', 'uncleared') as string,
+										};
+
+										if (payeeName) {
+											transaction.payee_name = payeeName;
+										}
+
+										if (memo) {
+											transaction.memo = memo;
+										}
+
 										const body = {
-											transaction: {
-												account_id: this.getNodeParameter('accountId') as string,
-												date: this.getNodeParameter('date') as string,
-												amount: this.getNodeParameter('amount') as number,
-												payee_name: this.getNodeParameter('payeeName', '') as string,
-												memo: this.getNodeParameter('memo', '') as string,
-												cleared: this.getNodeParameter('cleared', 'uncleared') as string,
-											},
+											transaction,
 										};
 										return {
 											...requestOptions,
@@ -492,15 +565,28 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
+										const payeeName = (
+											this.getNodeParameter('payeeName') as string
+										).trim();
+										const memo = (this.getNodeParameter('memo') as string).trim();
+
+										const transaction: IDataObject = {
+											account_id: this.getNodeParameter('accountId') as string,
+											date: this.getNodeParameter('date') as string,
+											amount: this.getNodeParameter('amount') as number,
+											cleared: this.getNodeParameter('cleared', 'uncleared') as string,
+										};
+
+										if (payeeName) {
+											transaction.payee_name = payeeName;
+										}
+
+										if (memo) {
+											transaction.memo = memo;
+										}
+
 										const body = {
-											transaction: {
-												account_id: this.getNodeParameter('accountId') as string,
-												date: this.getNodeParameter('date') as string,
-												amount: this.getNodeParameter('amount') as number,
-												payee_name: this.getNodeParameter('payeeName', '') as string,
-												memo: this.getNodeParameter('memo', '') as string,
-												cleared: this.getNodeParameter('cleared', 'uncleared') as string,
-											},
+											transaction,
 										};
 										return {
 											...requestOptions,
@@ -558,6 +644,70 @@ export class Ynab implements INodeType {
 				},
 				default: '',
 				description: 'The ID of the plan',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+					{
+						displayName: 'Since Date',
+						name: 'sinceDate',
+						type: 'string',
+						default: '',
+						description:
+							'Only transactions on or after this ISO date (YYYY-MM-DD) are returned',
+						routing: {
+							request: {
+								qs: {
+									since_date: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+					{
+						displayName: 'Type',
+						name: 'transactionType',
+						type: 'options',
+						options: [
+							{ name: 'None', value: '' },
+							{ name: 'Uncategorized', value: 'uncategorized' },
+							{ name: 'Unapproved', value: 'unapproved' },
+						],
+						default: '',
+						description: 'Filter transactions by transaction type',
+						routing: {
+							request: {
+								qs: {
+									type: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
 			},
 			{
 				displayName: 'Transaction ID',
@@ -733,6 +883,36 @@ export class Ynab implements INodeType {
 				description: 'The ID of the plan',
 			},
 			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
 				displayName: 'Category ID',
 				name: 'categoryId',
 				type: 'string',
@@ -818,6 +998,36 @@ export class Ynab implements INodeType {
 				},
 				default: '',
 				description: 'The ID of the plan',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['payee'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
 			},
 			{
 				displayName: 'Payee ID',
