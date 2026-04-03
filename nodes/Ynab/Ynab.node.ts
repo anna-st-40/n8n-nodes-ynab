@@ -1,9 +1,12 @@
 import {
 	INodeType,
 	INodeTypeDescription,
+	INodeListSearchItems,
+	INodeListSearchResult,
 	INodeExecutionData,
 	IExecuteFunctions,
 	IExecuteSingleFunctions,
+	ILoadOptionsFunctions,
 	IDataObject,
 	IHttpRequestMethods,
 	IHttpRequestOptions,
@@ -155,9 +158,9 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Plan ID',
+				displayName: 'Plan',
 				name: 'planId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -165,8 +168,29 @@ export class Ynab implements INodeType {
 						operation: ['get', 'getSettings'],
 					},
 				},
-				default: '',
-				description: 'The ID of the plan',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -323,17 +347,38 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Plan ID',
+				displayName: 'Plan',
 				name: 'planId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['account'],
 					},
 				},
-				default: '',
-				description: 'The ID of the plan',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -633,17 +678,38 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Plan ID',
+				displayName: 'Plan',
 				name: 'planId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['transaction'],
 					},
 				},
-				default: '',
-				description: 'The ID of the plan',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -870,17 +936,38 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Plan ID',
+				displayName: 'Plan',
 				name: 'planId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['category'],
 					},
 				},
-				default: '',
-				description: 'The ID of the plan',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -987,17 +1074,38 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Plan ID',
+				displayName: 'Plan',
 				name: 'planId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['payee'],
 					},
 				},
-				default: '',
-				description: 'The ID of the plan',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -1082,5 +1190,39 @@ export class Ynab implements INodeType {
 				default: 'get',
 			},
 		],
+	};
+
+	methods = {
+		listSearch: {
+			async searchPlans(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+					url: 'https://api.ynab.com/v1/plans',
+					method: 'GET',
+					json: true,
+				})) as IDataObject;
+
+				const plans = (((response.data as IDataObject)?.plans as IDataObject[]) || []).filter(
+					(plan) => typeof plan.id === 'string',
+				);
+				const normalizedFilter = (filter || '').toLowerCase();
+
+				const results: INodeListSearchItems[] = plans
+					.filter((plan) => {
+						if (!normalizedFilter) return true;
+						const name = String(plan.name || '').toLowerCase();
+						const id = String(plan.id || '').toLowerCase();
+						return name.includes(normalizedFilter) || id.includes(normalizedFilter);
+					})
+					.map((plan) => ({
+						name: String(plan.name || plan.id),
+						value: String(plan.id),
+					}));
+
+				return { results };
+			},
+		},
 	};
 }
