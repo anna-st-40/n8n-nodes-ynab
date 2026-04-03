@@ -14,6 +14,30 @@ import {
 } from 'n8n-workflow';
 
 export class Ynab implements INodeType {
+	private static readonly LOCATOR_CACHE_TTL_MS = 300_000;
+
+	private static getLocatorValue(input: unknown): string {
+		if (typeof input === 'string') return input.trim();
+		if (!input || typeof input !== 'object') return '';
+
+		const candidate = input as { value?: unknown; id?: unknown };
+		if (typeof candidate.value === 'string') return candidate.value.trim();
+		if (typeof candidate.id === 'string') return candidate.id.trim();
+		if (candidate.value && typeof candidate.value === 'object') {
+			const nested = candidate.value as { id?: unknown; value?: unknown };
+			if (typeof nested.id === 'string') return nested.id.trim();
+			if (typeof nested.value === 'string') return nested.value.trim();
+		}
+
+		return '';
+	}
+
+	private static locatorCache = {
+		plans: null as null | { fetchedAt: number; items: Array<{ id: string; name: string }> },
+		accountsByPlan: {} as Record<string, { fetchedAt: number; items: Array<{ id: string; name: string }> }>,
+		categoriesByPlan: {} as Record<string, { fetchedAt: number; items: Array<{ id: string; name: string }> }>,
+	};
+
 	description: INodeTypeDescription = {
 		displayName: 'YNAB',
 		name: 'ynab',
@@ -398,9 +422,9 @@ export class Ynab implements INodeType {
 				],
 			},
 			{
-				displayName: 'Account ID',
+				displayName: 'Account',
 				name: 'accountId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -408,8 +432,29 @@ export class Ynab implements INodeType {
 						operation: ['get'],
 					},
 				},
-				default: '',
-				description: 'The ID of the account',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
 			},
 			{
 				displayName: 'Account Name',
@@ -818,9 +863,9 @@ export class Ynab implements INodeType {
 					'Select which transactions endpoint to query. Plan is the default and returns all non-pending transactions for the plan. The other scopes require a target ID or month and map to the account, category, payee, or month-specific list endpoints from the API.',
 			},
 			{
-				displayName: 'Account ID',
+				displayName: 'Account',
 				name: 'transactionAccountId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -829,13 +874,34 @@ export class Ynab implements INodeType {
 						transactionListScope: ['account'],
 					},
 				},
-				default: '',
-				description: 'The ID of the account',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
 			},
 			{
-				displayName: 'Category ID',
+				displayName: 'Category',
 				name: 'transactionCategoryId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -844,8 +910,29 @@ export class Ynab implements INodeType {
 						transactionListScope: ['category'],
 					},
 				},
-				default: '',
-				description: 'The ID of the category',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchCategories',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select a category from the selected plan or enter a category ID',
 			},
 			{
 				displayName: 'Payee ID',
@@ -970,9 +1057,9 @@ export class Ynab implements INodeType {
 				description: 'The ID of the transaction',
 			},
 			{
-				displayName: 'Account ID',
+				displayName: 'Account',
 				name: 'accountId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -980,8 +1067,29 @@ export class Ynab implements INodeType {
 						operation: ['create', 'update'],
 					},
 				},
-				default: '',
-				description: 'The ID of the account',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
 			},
 			{
 				displayName: 'Date',
@@ -1522,9 +1630,9 @@ export class Ynab implements INodeType {
 				description: 'The goal target date in ISO format (YYYY-MM-DD)',
 			},
 			{
-				displayName: 'Category ID',
+				displayName: 'Category',
 				name: 'categoryId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -1532,8 +1640,29 @@ export class Ynab implements INodeType {
 						operation: ['get', 'update', 'getMonth', 'updateMonth'],
 					},
 				},
-				default: '',
-				description: 'The ID of the category',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchCategories',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select a category from the selected plan or enter a category ID',
 			},
 			{
 				displayName: 'Month',
@@ -2293,7 +2422,7 @@ export class Ynab implements INodeType {
 											this.getNodeParameter('scheduledDate') || '',
 										).trim();
 										if (!scheduledAccountId) {
-											throw new NodeOperationError(this.getNode(), 'Account ID is required');
+											throw new NodeOperationError(this.getNode(), 'Account is required');
 										}
 										if (!scheduledDate) {
 											throw new NodeOperationError(this.getNode(), 'Date is required');
@@ -2388,7 +2517,7 @@ export class Ynab implements INodeType {
 											this.getNodeParameter('scheduledDate') || '',
 										).trim();
 										if (!scheduledAccountId) {
-											throw new NodeOperationError(this.getNode(), 'Account ID is required');
+											throw new NodeOperationError(this.getNode(), 'Account is required');
 										}
 										if (!scheduledDate) {
 											throw new NodeOperationError(this.getNode(), 'Date is required');
@@ -2560,9 +2689,9 @@ export class Ynab implements INodeType {
 				description: 'The ID of the scheduled transaction',
 			},
 			{
-				displayName: 'Account ID',
+				displayName: 'Account',
 				name: 'scheduledAccountId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -2570,8 +2699,29 @@ export class Ynab implements INodeType {
 						operation: ['create', 'update'],
 					},
 				},
-				default: '',
-				description: 'The ID of the account',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
 			},
 			{
 				displayName: 'Date',
@@ -2627,17 +2777,38 @@ export class Ynab implements INodeType {
 				description: 'The payee name to use when payee ID is not provided',
 			},
 			{
-				displayName: 'Category ID',
+				displayName: 'Category',
 				name: 'scheduledCategoryId',
-				type: 'string',
+				type: 'resourceLocator',
 				displayOptions: {
 					show: {
 						resource: ['scheduledTransaction'],
 						operation: ['create', 'update'],
 					},
 				},
-				default: '',
-				description: 'The ID of the category',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchCategories',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select a category from the selected plan or enter a category ID',
 			},
 			{
 				displayName: 'Memo',
@@ -2750,27 +2921,171 @@ export class Ynab implements INodeType {
 				this: ILoadOptionsFunctions,
 				filter?: string,
 			): Promise<INodeListSearchResult> {
-				const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
-					url: 'https://api.ynab.com/v1/plans',
-					method: 'GET',
-					json: true,
-				})) as IDataObject;
+				const now = Date.now();
+				const plansCache = Ynab.locatorCache.plans;
+				let plans: Array<{ id: string; name: string }> = [];
 
-				const plans = (((response.data as IDataObject)?.plans as IDataObject[]) || []).filter(
-					(plan) => typeof plan.id === 'string',
-				);
+				if (plansCache && now - plansCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
+					plans = plansCache.items;
+				} else {
+					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+						url: 'https://api.ynab.com/v1/plans',
+						method: 'GET',
+						json: true,
+					})) as IDataObject;
+
+					plans = ((((response.data as IDataObject)?.plans as IDataObject[]) || [])
+						.filter((plan) => typeof plan.id === 'string')
+						.map((plan) => ({
+							id: String(plan.id),
+							name: String(plan.name || plan.id),
+						})));
+
+					Ynab.locatorCache.plans = {
+						fetchedAt: now,
+						items: plans,
+					};
+				}
+
 				const normalizedFilter = (filter || '').toLowerCase();
 
 				const results: INodeListSearchItems[] = plans
 					.filter((plan) => {
 						if (!normalizedFilter) return true;
-						const name = String(plan.name || '').toLowerCase();
-						const id = String(plan.id || '').toLowerCase();
+						const name = plan.name.toLowerCase();
+						const id = plan.id.toLowerCase();
 						return name.includes(normalizedFilter) || id.includes(normalizedFilter);
 					})
 					.map((plan) => ({
-						name: String(plan.name || plan.id),
-						value: String(plan.id),
+						name: plan.name,
+						value: plan.id,
+					}));
+
+				return { results };
+			},
+			async searchAccounts(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				let planId = '';
+				try {
+					planId = Ynab.getLocatorValue(this.getNodeParameter('planId', ''));
+				} catch {
+					return { results: [] };
+				}
+
+				if (!planId) {
+					return { results: [] };
+				}
+
+				const now = Date.now();
+				const accountCache = Ynab.locatorCache.accountsByPlan[planId];
+				let accounts: Array<{ id: string; name: string }> = [];
+
+				if (accountCache && now - accountCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
+					accounts = accountCache.items;
+				} else {
+					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+						url: `https://api.ynab.com/v1/plans/${planId}/accounts`,
+						method: 'GET',
+						json: true,
+					})) as IDataObject;
+
+					accounts = ((((response.data as IDataObject)?.accounts as IDataObject[]) || [])
+						.filter((account) => typeof account.id === 'string')
+						.map((account) => ({
+							id: String(account.id),
+							name: String(account.name || account.id),
+						})));
+
+					Ynab.locatorCache.accountsByPlan[planId] = {
+						fetchedAt: now,
+						items: accounts,
+					};
+				}
+
+				const normalizedFilter = (filter || '').toLowerCase();
+
+				const results: INodeListSearchItems[] = accounts
+					.filter((account) => {
+						if (!normalizedFilter) return true;
+						const name = account.name.toLowerCase();
+						const id = account.id.toLowerCase();
+						return name.includes(normalizedFilter) || id.includes(normalizedFilter);
+					})
+					.map((account) => ({
+						name: account.name,
+						value: account.id,
+					}));
+
+				return { results };
+			},
+			async searchCategories(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				let planId = '';
+				try {
+					planId = Ynab.getLocatorValue(this.getNodeParameter('planId', ''));
+				} catch {
+					return { results: [] };
+				}
+
+				if (!planId) {
+					return { results: [] };
+				}
+
+				const now = Date.now();
+				const categoryCache = Ynab.locatorCache.categoriesByPlan[planId];
+				let categories: Array<{ id: string; name: string }> = [];
+
+				if (categoryCache && now - categoryCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
+					categories = categoryCache.items;
+				} else {
+					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+						url: `https://api.ynab.com/v1/plans/${planId}/categories`,
+						method: 'GET',
+						json: true,
+					})) as IDataObject;
+
+					const categoryGroups =
+						(((response.data as IDataObject)?.category_groups as IDataObject[]) || []).filter(
+							(group) => group && typeof group === 'object',
+						);
+
+					for (const group of categoryGroups) {
+						const groupName = String(group.name || '').trim();
+						const groupCategories = ((group.categories as IDataObject[]) || []).filter(
+							(category) => typeof category.id === 'string' && category.deleted !== true,
+						);
+
+						for (const category of groupCategories) {
+							const categoryName = String(category.name || category.id).trim();
+							categories.push({
+								id: String(category.id),
+								name: groupName ? `${groupName} / ${categoryName}` : categoryName,
+							});
+						}
+					}
+
+					Ynab.locatorCache.categoriesByPlan[planId] = {
+						fetchedAt: now,
+						items: categories,
+					};
+				}
+
+				const normalizedFilter = (filter || '').toLowerCase();
+				const results: INodeListSearchItems[] = categories
+					.filter((category) => {
+						if (!normalizedFilter) return true;
+						return (
+							category.name.toLowerCase().includes(normalizedFilter) ||
+							category.id.toLowerCase().includes(normalizedFilter)
+						);
+					})
+					.map((category) => ({
+						name: category.name,
+						value: category.id,
 					}));
 
 				return { results };
