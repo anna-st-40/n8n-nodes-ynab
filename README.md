@@ -2,17 +2,21 @@
 
 ![YNAB Logo](https://cdn.prod.website-files.com/640f69143ec11b21d42015c6/6758a5396561162bbe65ae5c_524ab88af6960dd452642470297f8130_Tree%20Logo%20Blurple%20(2).svg)
 
-Custom n8n node for YNAB (You Need A Budget) API integration. This node allows you to interact with your YNAB plans, accounts, transactions, categories, and payees directly from n8n workflows.
+Custom n8n node for YNAB (You Need A Budget) API integration. This node allows you to interact with your YNAB plans, accounts, categories, payees, payee locations, months, money movements, transactions, and scheduled transactions directly from n8n workflows.
 
 ## Features
 
-### Supported Resources
+### Supported Resources and Operations
 
-- **Plans**: Get all plans, get single plan, get plan settings
-- **Accounts**: Get all accounts, get single account, create account
-- **Transactions**: Get all, get single, create, update, delete transactions
-- **Categories**: Get all categories, get single category
-- **Payees**: Get all payees, get single payee
+- **Plans**: Get all, get by ID, get settings
+- **Accounts**: Get all, get by ID, create
+- **Categories**: Get all, get by ID, create, update, get month category, update month category, create group, update group
+- **Payees**: Get all, get by ID, create, update
+- **Payee Locations**: Get all, get by ID, filter by payee ID
+- **Months**: Get all, get by month
+- **Money Movements**: Get all movements, get all groups, optional month scoping
+- **Transactions**: Get all, get by ID, create, update, delete, update multiple, import
+- **Scheduled Transactions**: Get all, get by ID, create, update, delete
 - **User**: Get authenticated user information
 
 ### Authentication
