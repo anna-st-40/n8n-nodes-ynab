@@ -1,4 +1,5 @@
 import {
+	NodeOperationError,
 	INodeType,
 	INodeTypeDescription,
 	INodeListSearchItems,
@@ -496,7 +497,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/plans/{{$parameter.planId}}/transactions',
+								url: '={{(() => { const planPath = "/plans/" + $parameter.planId; switch ($parameter.transactionListScope || "plan") { case "account": return planPath + "/accounts/" + $parameter.transactionAccountId + "/transactions"; case "category": return planPath + "/categories/" + $parameter.transactionCategoryId + "/transactions"; case "payee": return planPath + "/payees/" + $parameter.transactionPayeeId + "/transactions"; case "month": return planPath + "/months/" + $parameter.transactionMonth + "/transactions"; default: return planPath + "/transactions"; } })() }}',
 							},
 							output: {
 								postReceive: [
@@ -674,6 +675,84 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						name: 'Update Multiple',
+						value: 'updateMultiple',
+						description: 'Update multiple transactions',
+						action: 'Update multiple transactions',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/transactions',
+							},
+							send: {
+								type: 'body',
+								property: 'transactions',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const rawTransactions = String(
+											this.getNodeParameter('transactionsJson') || '',
+										).trim();
+
+										if (!rawTransactions) {
+											throw new NodeOperationError(this.getNode(), 'Transactions JSON is required');
+										}
+
+										let transactions: IDataObject[];
+										try {
+											transactions = JSON.parse(rawTransactions) as IDataObject[];
+										} catch {
+											throw new NodeOperationError(this.getNode(), 'Invalid JSON supplied for transactions');
+										}
+
+										if (!Array.isArray(transactions)) {
+											throw new NodeOperationError(this.getNode(), 'Transactions must be a JSON array');
+										}
+
+										return {
+											...requestOptions,
+											body: { transactions },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.transactions',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Import',
+						value: 'import',
+						description: 'Import transactions',
+						action: 'Import transactions',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/transactions/import',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data',
+										},
+									},
+								],
+							},
+						},
+					},
 				],
 				default: 'getAll',
 			},
@@ -710,6 +789,107 @@ export class Ynab implements INodeType {
 					},
 				],
 				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Scope',
+				name: 'transactionListScope',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+					},
+				},
+				options: [
+					{
+						name: 'Plan',
+						value: 'plan',
+						description: 'Return all plan transactions',
+					},
+					{
+						name: 'Account',
+						value: 'account',
+						description: 'Return transactions for a single account',
+					},
+					{
+						name: 'Category',
+						value: 'category',
+						description: 'Return transactions for a single category',
+					},
+					{
+						name: 'Payee',
+						value: 'payee',
+						description: 'Return transactions for a single payee',
+					},
+					{
+						name: 'Month',
+						value: 'month',
+						description: 'Return transactions for a specific month',
+					},
+				],
+				default: 'plan',
+				description:
+					'Select which transactions endpoint to query. Plan is the default and returns all non-pending transactions for the plan. The other scopes require a target ID or month and map to the account, category, payee, or month-specific list endpoints from the API.',
+			},
+			{
+				displayName: 'Account ID',
+				name: 'transactionAccountId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['account'],
+					},
+				},
+				default: '',
+				description: 'The ID of the account',
+			},
+			{
+				displayName: 'Category ID',
+				name: 'transactionCategoryId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['category'],
+					},
+				},
+				default: '',
+				description: 'The ID of the category',
+			},
+			{
+				displayName: 'Payee ID',
+				name: 'transactionPayeeId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['payee'],
+					},
+				},
+				default: '',
+				description: 'The ID of the payee',
+			},
+			{
+				displayName: 'Month',
+				name: 'transactionMonth',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['month'],
+					},
+				},
+				default: '',
+				description: 'The plan month in ISO format (YYYY-MM-DD) or current',
 			},
 			{
 				displayName: 'Additional Fields',
@@ -774,6 +954,20 @@ export class Ynab implements INodeType {
 						},
 					},
 				],
+			},
+			{
+				displayName: 'Transactions JSON',
+				name: 'transactionsJson',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['updateMultiple'],
+					},
+				},
+				default: '[]',
+				placeholder: '[{"id":"...","amount":12345}]',
+				description: 'JSON array of transaction updates',
 			},
 			{
 				displayName: 'Transaction ID',
@@ -932,6 +1126,283 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a new category',
+						action: 'Create a category',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/categories',
+							},
+							send: {
+								type: 'body',
+								property: 'category',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const categoryName = String(this.getNodeParameter('categoryName') || '').trim();
+										const parentCategoryGroupId = String(
+											this.getNodeParameter('parentCategoryGroupId') || '',
+										).trim();
+
+										if (!categoryName) {
+											throw new NodeOperationError(this.getNode(), 'Category name is required');
+										}
+
+										if (!parentCategoryGroupId) {
+											throw new NodeOperationError(this.getNode(), 'Parent category group ID is required');
+										}
+
+										const category: IDataObject = {
+											name: categoryName,
+											category_group_id: parentCategoryGroupId,
+										};
+
+										const note = String(this.getNodeParameter('note') || '').trim();
+										if (note) {
+											category.note = note;
+										}
+
+										const goalTarget = this.getNodeParameter('goalTarget');
+										if (typeof goalTarget === 'number' && Number.isFinite(goalTarget)) {
+											category.goal_target = goalTarget;
+										}
+
+										const goalTargetDate = String(this.getNodeParameter('goalTargetDate') || '').trim();
+										if (goalTargetDate) {
+											category.goal_target_date = goalTargetDate;
+										}
+
+										return {
+											...requestOptions,
+											body: { category },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update',
+						value: 'update',
+						description: 'Update a category',
+						action: 'Update a category',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/categories/{{$parameter.categoryId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'category',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const category: IDataObject = {};
+
+										const categoryName = String(this.getNodeParameter('categoryName') || '').trim();
+										if (categoryName) {
+											category.name = categoryName;
+										}
+
+										const parentCategoryGroupId = String(
+											this.getNodeParameter('parentCategoryGroupId') || '',
+										).trim();
+										if (parentCategoryGroupId) {
+											category.category_group_id = parentCategoryGroupId;
+										}
+
+										const note = String(this.getNodeParameter('note') || '').trim();
+										if (note) {
+											category.note = note;
+										}
+
+										const goalTarget = this.getNodeParameter('goalTarget');
+										if (typeof goalTarget === 'number' && Number.isFinite(goalTarget)) {
+											category.goal_target = goalTarget;
+										}
+
+										const goalTargetDate = String(this.getNodeParameter('goalTargetDate') || '').trim();
+										if (goalTargetDate) {
+											category.goal_target_date = goalTargetDate;
+										}
+
+										return {
+											...requestOptions,
+											body: { category },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get Month',
+						value: 'getMonth',
+						description: 'Get a category for a specific plan month',
+						action: 'Get a month category',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/months/{{$parameter.month}}/categories/{{$parameter.categoryId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update Month',
+						value: 'updateMonth',
+						description: 'Update a category for a specific month',
+						action: 'Update a month category',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/months/{{$parameter.month}}/categories/{{$parameter.categoryId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'category',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										return {
+											...requestOptions,
+											body: {
+												category: {
+													budgeted: this.getNodeParameter('budgeted') as number,
+												},
+											},
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Create Group',
+						value: 'createGroup',
+						description: 'Create a new category group',
+						action: 'Create a category group',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/category_groups',
+							},
+							send: {
+								type: 'body',
+								property: 'category_group',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const categoryGroupName = String(this.getNodeParameter('categoryGroupName') || '').trim();
+										if (!categoryGroupName) {
+											throw new NodeOperationError(this.getNode(), 'Category group name is required');
+										}
+										return {
+											...requestOptions,
+											body: { category_group: { name: categoryGroupName } },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.category_group' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update Group',
+						value: 'updateGroup',
+						description: 'Update a category group',
+						action: 'Update a category group',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/category_groups/{{$parameter.categoryGroupId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'category_group',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const categoryGroupName = String(this.getNodeParameter('categoryGroupName') || '').trim();
+										if (!categoryGroupName) {
+											throw new NodeOperationError(this.getNode(), 'Category group name is required');
+										}
+										return {
+											...requestOptions,
+											body: { category_group: { name: categoryGroupName } },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.category_group' },
+									},
+								],
+							},
+						},
+					},
 				],
 				default: 'getAll',
 			},
@@ -1000,6 +1471,71 @@ export class Ynab implements INodeType {
 				],
 			},
 			{
+				displayName: 'Category Name',
+				name: 'categoryName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The name of the category',
+			},
+			{
+				displayName: 'Parent Category Group ID',
+				name: 'parentCategoryGroupId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The ID of the parent category group',
+			},
+			{
+				displayName: 'Note',
+				name: 'note',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The note for the category',
+			},
+			{
+				displayName: 'Goal Target',
+				name: 'goalTarget',
+				type: 'number',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: 0,
+				description: 'The goal target amount in milliunits format',
+			},
+			{
+				displayName: 'Goal Target Date',
+				name: 'goalTargetDate',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The goal target date in ISO format (YYYY-MM-DD)',
+			},
+			{
 				displayName: 'Category ID',
 				name: 'categoryId',
 				type: 'string',
@@ -1007,11 +1543,66 @@ export class Ynab implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['category'],
-						operation: ['get'],
+						operation: ['get', 'update', 'getMonth', 'updateMonth'],
 					},
 				},
 				default: '',
 				description: 'The ID of the category',
+			},
+			{
+				displayName: 'Month',
+				name: 'month',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['getMonth', 'updateMonth'],
+					},
+				},
+				default: '',
+				description: 'The plan month in ISO format (YYYY-MM-DD) or current',
+			},
+			{
+				displayName: 'Budgeted',
+				name: 'budgeted',
+				type: 'number',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['updateMonth'],
+					},
+				},
+				default: 0,
+				description: 'Assigned amount in milliunits format',
+			},
+			{
+				displayName: 'Category Group Name',
+				name: 'categoryGroupName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['createGroup', 'updateGroup'],
+					},
+				},
+				default: '',
+				description: 'The name of the category group',
+			},
+			{
+				displayName: 'Category Group ID',
+				name: 'categoryGroupId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['updateGroup'],
+					},
+				},
+				default: '',
+				description: 'The ID of the category group',
 			},
 
 			// Payee Operations
@@ -1070,6 +1661,91 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a new payee',
+						action: 'Create a payee',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/payees',
+							},
+							send: {
+								type: 'body',
+								property: 'payee',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const payeeResourceName = String(
+											this.getNodeParameter('payeeResourceName') || '',
+										).trim();
+										if (!payeeResourceName) {
+											throw new NodeOperationError(this.getNode(), 'Payee name is required');
+										}
+
+										return {
+											...requestOptions,
+											body: { payee: { name: payeeResourceName } },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.payee' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update',
+						value: 'update',
+						description: 'Update a payee',
+						action: 'Update a payee',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/payees/{{$parameter.payeeId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'payee',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const payeeResourceName = String(
+											this.getNodeParameter('payeeResourceName') || '',
+										).trim();
+										const payee: IDataObject = {};
+										if (payeeResourceName) {
+											payee.name = payeeResourceName;
+										}
+
+										return {
+											...requestOptions,
+											body: { payee },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.payee' },
+									},
+								],
+							},
+						},
+					},
 				],
 				default: 'getAll',
 			},
@@ -1138,6 +1814,19 @@ export class Ynab implements INodeType {
 				],
 			},
 			{
+				displayName: 'Payee Name',
+				name: 'payeeResourceName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['payee'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The name of the payee',
+			},
+			{
 				displayName: 'Payee ID',
 				name: 'payeeId',
 				type: 'string',
@@ -1145,7 +1834,7 @@ export class Ynab implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['payee'],
-						operation: ['get'],
+						operation: ['get', 'update'],
 					},
 				},
 				default: '',
