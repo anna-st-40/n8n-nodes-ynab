@@ -1,0 +1,64 @@
+name: Publish to npm
+
+# Publishes the package to npm with a provenance statement, which n8n requires
+# for community nodes. Provenance links the published tarball back to this
+# workflow run and commit, so npm can attest to where the package was built.
+#
+# Auth uses npm trusted publishing (OIDC) — no NPM_TOKEN needed. Before the
+# first release, configure this repo and workflow as a trusted publisher at:
+#   https://www.npmjs.com/package/n8n-nodes-ynab-api/access
+# If you use a granular access token instead, add it as the NPM_TOKEN secret
+# and uncomment the `env` block on the publish step below.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write # required to mint the OIDC token for provenance
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+
+      # Trusted publishing and --provenance need npm 11.5.1 or newer, which is
+      # ahead of the npm bundled with the Node.js runtime.
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Verify package version matches release tag
+        if: github.event_name == 'release'
+        run: |
+          PKG_VERSION="$(node -p "require('./package.json').version")"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+            echo "package.json version ($PKG_VERSION) does not match release tag ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "Publishing version $PKG_VERSION"
+
+      - name: Publish
+        run: npm publish --provenance --access public
+        # env:
+        #   NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
