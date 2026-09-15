@@ -2,256 +2,97 @@
 
 # n8n-nodes-ynab-api
 
-Community n8n node for the YNAB (You Need A Budget) API — work with your plans, accounts, categories, payees, payee locations, months, money movements, transactions, and scheduled transactions directly from n8n workflows.
+This is an n8n community node. It lets you use [YNAB](https://www.ynab.com/) in your n8n workflows.
 
-## Why this node
+YNAB (You Need A Budget) is a zero-based budgeting service. Its API exposes your plans, accounts, categories, payees, transactions, and monthly budget data, so you can automate categorization, reporting, and transaction import.
 
-- **Complete API coverage** — every endpoint in the current YNAB API v1, including money movements, category groups, payee locations, bulk transaction updates, and transaction import.
-- **Searchable resource pickers** — plans, accounts, categories, and payees use n8n resource locators, so you can search by name, pick from a list, or paste an ID instead of hunting through a flat dropdown.
-- **Works as an AI Agent tool** — the node sets `usableAsTool`, so an n8n AI Agent can call any YNAB operation directly.
-- **Current API terminology** — tracks YNAB's rename of Budgets to Plans.
+[n8n](https://n8n.io/) is a [fair-code licensed](https://docs.n8n.io/reference/license/) workflow automation platform.
 
-## Attribution
-
-This project is a fork of [Npab19/n8n-nodes-YNAB](https://github.com/Npab19/n8n-nodes-YNAB) by Nikko Pabion, used under the MIT License. It was forked to bring the node up to full parity with the current YNAB API; the fork rewrites most of the node implementation, adds the remaining resources and operations, and converts the ID fields to resource locators.
-
-## Features
-
-### Supported Resources and Operations
-
-- **Plans**: Get all, get by ID, get settings
-- **Accounts**: Get all, get by ID, create
-- **Categories**: Get all, get by ID, create, update, get month category, update month category, create group, update group
-- **Payees**: Get all, get by ID, create, update
-- **Payee Locations**: Get all, get by ID, filter by payee ID
-- **Months**: Get all, get by month
-- **Money Movements**: Get all movements, get all groups, optional month scoping
-- **Transactions**: Get all, get by ID, create, update, delete, update multiple, import
-- **Scheduled Transactions**: Get all, get by ID, create, update, delete
-- **User**: Get authenticated user information
-
-### Authentication
-
-Uses YNAB Personal Access Token for authentication.
+[Installation](#installation)  
+[Operations](#operations)  
+[Credentials](#credentials)  
+[Compatibility](#compatibility)  
+[Usage](#usage)  
+[Resources](#resources)  
+[Version history](#version-history)  
 
 ## Installation
 
-### For n8n Cloud or Self-Hosted
+Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes/installation/) in the n8n community nodes documentation, using the package name `n8n-nodes-ynab-api`.
 
-#### Option 1: Install via npm (Recommended)
+## Operations
 
-1. Go to **Settings** > **Community Nodes**
-2. Click **Install**
-3. Enter `n8n-nodes-ynab-api`
-4. Click **Install**
+The node covers every endpoint in YNAB API v1. Plans, accounts, categories, and payees use n8n resource locators, so you can search by name, pick from a list, or paste an ID.
 
-#### Option 2: Manual Installation
+* **Plan**: Get all, Get, Get settings
+* **Account**: Get all, Get, Create
+* **Category**: Get all, Get, Create, Update, Get month category, Update month category, Create group, Update group
+* **Payee**: Get all, Get, Create, Update
+* **Payee Location**: Get all (optionally filtered to a single payee), Get
+* **Month**: Get all, Get
+* **Money Movement**: Get all movements, Get all groups (both optionally scoped to a month)
+* **Transaction**: Get all, Get, Create, Update, Delete, Update multiple, Import
+* **Scheduled Transaction**: Get all, Get, Create, Update, Delete
+* **User**: Get user info
 
-For self-hosted n8n instances:
+## Credentials
 
-```bash
-# Navigate to your n8n custom nodes directory
-cd ~/.n8n/custom
+Authentication uses a YNAB Personal Access Token. You need a YNAB account.
 
-# Clone this repository
-git clone https://github.com/anna-st-40/n8n-nodes-ynab.git
+1. Open [YNAB developer settings](https://app.ynab.com/settings/developer).
+2. Click **New Token** and give it a name, for example `n8n Integration`.
+3. Copy the token — YNAB shows it only once.
+4. In n8n, create new credentials of type **YNAB API** and paste the token.
+5. Click **Test** to verify the connection, then **Save**.
 
-# Install dependencies and build
-cd n8n-nodes-ynab
-npm install
-npm run build
-
-# Restart n8n
-```
-
-### For Development
-
-1. Clone this repository:
-   ```bash
-   git clone https://github.com/anna-st-40/n8n-nodes-ynab.git
-   cd n8n-nodes-ynab
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Build the node:
-   ```bash
-   npm run build
-   ```
-
-4. Link for local n8n development:
-   ```bash
-   npm link
-   cd ~/.n8n/custom
-   npm link n8n-nodes-ynab-api
-   ```
-
-5. Start your local n8n instance and test the node
-
-## Usage
-
-### Setting up Credentials
-
-#### Getting Your YNAB API Token
-
-1. Go to [YNAB Account Settings](https://app.ynab.com/settings/developer)
-2. Click on **New Token**
-3. Give it a name (e.g., "n8n Integration")
-4. Copy the generated token (you won't be able to see it again!)
-
-#### Configuring in n8n
-
-1. In n8n, create new credentials of type **"YNAB API"**
-2. Paste your YNAB Personal Access Token
-3. Click **Test** to verify the connection
-4. Click **Save**
-
-### Example Workflow: Get All Plans
-
-A ready-to-import version of this workflow is in [examples/get-all-plans.json](examples/get-all-plans.json) — import it from **Workflows** > **Import from File**, then select your credentials.
-
-1. Add a "Manual Trigger" node
-2. Add a "YNAB" node
-3. Configure the YNAB node:
-   - **Resource**: Plan
-   - **Operation**: Get All
-   - **Include Accounts**: true (optional)
-4. Connect the credentials
-5. Execute the workflow
-
-### Example Workflow: Create Transaction
-
-1. Add a trigger node
-2. Add a "YNAB" node
-3. Configure the YNAB node:
-   - **Resource**: Transaction
-   - **Operation**: Create
-   - **Plan ID**: Your plan ID
-   - **Account ID**: Your account ID
-   - **Date**: Transaction date (YYYY-MM-DD)
-   - **Amount**: Amount in milliunits (e.g., 10000 = $10.00)
-   - **Payee Name**: Payee name
-   - **Memo**: Optional memo
-   - **Cleared**: uncleared/cleared/reconciled
-
-## Common Use Cases
-
-### Budget Monitoring
-- Get all plans and their balances
-- Monitor spending across categories
-- Track account balances
-- Generate budget reports
-
-### Transaction Management
-- Create transactions automatically from external sources
-- Update transaction categories and memos
-- Reconcile transactions programmatically
-- Import transactions from other services
-
-### AI-Powered Budgeting
-- Use with n8n's AI Agent for intelligent budget analysis
-- Get spending recommendations based on patterns
-- Automate categorization with AI
-- Generate natural language budget summaries
-
-### Automation Examples
-- Auto-categorize recurring transactions
-- Send notifications when budgets are exceeded
-- Sync transactions between multiple plans
-- Generate monthly spending reports
-
-## API Reference
-
-This node implements the YNAB API v1. For more information about YNAB API:
-- [YNAB API Documentation](https://api.ynab.com)
-- [Get Personal Access Token](https://api.ynab.com/#personal-access-tokens)
-
-## Development
-
-### File Structure
-
-```
-.
-├── credentials/
-│   └── YnabApi.credentials.ts      # YNAB API credentials definition
-├── nodes/
-│   └── Ynab/
-│       ├── Ynab.node.ts            # Main node implementation
-│       ├── Ynab.node.json          # Node codex metadata
-│       └── ynab.svg                # Node icon
-├── examples/                       # Importable example workflows
-├── dist/                           # Compiled JavaScript (generated)
-├── package.json                    # Node package configuration
-└── tsconfig.json                   # TypeScript configuration
-```
-
-### Building
-
-```bash
-npm run build
-```
-
-### Linting
-
-```bash
-npm run lint
-npm run lintfix  # Auto-fix issues
-```
+The token grants full read and write access to every plan on the account. Revoke it from the same YNAB settings page if it is ever exposed.
 
 ## Compatibility
 
-- **n8n version**: 1.110.1+
-- **Node.js**: 20.19+
-- **YNAB API**: v1
+* **n8n**: 1.110.1 or newer
+* **Node.js**: 20.19 or newer; CI builds and lints against Node.js 20.x and 22.x
+* **YNAB API**: v1
 
-## License
+## Usage
+
+New to n8n? Start with the [Try it out](https://docs.n8n.io/try-it-out/) documentation.
+
+### Amounts are in milliunits
+
+YNAB represents money in milliunits: `10000` is $10.00, and outflows are negative. Multiply by 1000 when you build a transaction, and divide by 1000 when you report a balance.
+
+### Example workflow
+
+[examples/get-all-plans.json](examples/get-all-plans.json) is a ready-to-import workflow that lists your plans. Import it from **Workflows** > **Import from File**, then select your credentials.
+
+To create a transaction, set **Resource** to `Transaction` and **Operation** to `Create`, then pick the plan and account and fill in the date (`YYYY-MM-DD`), amount in milliunits, payee, and cleared status.
+
+### Using the node as an AI Agent tool
+
+The node sets `usableAsTool`, so an AI Agent can call any YNAB operation directly. On self-hosted n8n you first have to allow community packages as tools:
+
+```bash
+export N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
+```
+
+Then connect the YNAB node to the tools input of an **AI Agent** (Tools Agent) node. The agent picks the operation from the request, so prompts like "what's my total balance across all accounts?" or "add a $50 transaction at Starbucks in my coffee category" work without extra wiring.
+
+Because a Personal Access Token can write to your real budget, give agents that can create, update, or delete transactions the usual review before letting them run unattended.
+
+## Resources
+
+* [n8n community nodes documentation](https://docs.n8n.io/integrations/#community-nodes)
+* [YNAB API documentation](https://api.ynab.com)
+* [YNAB Personal Access Tokens](https://api.ynab.com/#personal-access-tokens)
+
+## Version history
+
+* **1.0.0** — First release under this package name. Full coverage of YNAB API v1, including money movements, category groups, payee locations, bulk transaction updates, and transaction import; resource locators for plans, accounts, categories, and payees; AI Agent tool support; and YNAB's current Plans terminology in place of Budgets.
+
+## License and attribution
 
 [MIT](LICENSE). Copyright (c) 2025 Nikko Pabion, Copyright (c) 2026 Anna Stefaniv Oickle.
 
-See [NOTICE](NOTICE) for fork attribution and trademark information.
+This project is a fork of [Npab19/n8n-nodes-YNAB](https://github.com/Npab19/n8n-nodes-YNAB) by Nikko Pabion, used under the MIT License. The fork brings the node up to full parity with the current YNAB API: it rewrites most of the node implementation, adds the remaining resources and operations, and converts the ID fields to resource locators.
 
-## Support
-
-For issues and questions:
-- This node: https://github.com/anna-st-40/n8n-nodes-ynab/issues
-- YNAB API: https://api.ynab.com
-- n8n Documentation: https://docs.n8n.io
-
-## AI Agent Compatibility
-
-This node is fully compatible with n8n's AI Agent (LangChain) and can be used as a tool by AI agents.
-
-### Using with AI Agents
-
-1. **Enable Community Package Tool Usage** (required for self-hosted n8n):
-   ```bash
-   export N8N_COMMUNITY_PACKAGES_ALLOW_TOOL_USAGE=true
-   ```
-   Or add to your n8n environment configuration.
-
-2. **Add as a Tool to AI Agent**:
-   - Add an **AI Agent** node (Tools Agent type)
-   - Connect the YNAB node to the AI Agent's tools input
-   - The AI will automatically use YNAB operations when needed
-
-3. **Example AI Agent Use Cases**:
-   - "What's my total budget balance across all accounts?"
-   - "Create a transaction for $50 at Starbucks in my coffee category"
-   - "Show me all transactions from last week"
-   - "What categories am I overspending in?"
-   - "Add a $100 payment to my credit card account"
-
-The AI agent can intelligently select the appropriate YNAB operations (get plans, create transactions, etc.) based on natural language requests.
-
-### AI Agent Workflow Example
-
-```
-Manual Trigger → AI Agent (Tools Agent) → [Connected Tools]
-                                            ├─ YNAB Node
-                                            └─ Other Tools
-```
-
-The node uses `usableAsTool: true` to enable AI agent integration, allowing the AI to understand and utilize all available YNAB operations dynamically.
+See [NOTICE](NOTICE) for fork attribution and trademark information. This is an independent community integration and is not affiliated with, endorsed by, or sponsored by You Need A Budget LLC.

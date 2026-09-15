@@ -26,6 +26,31 @@ Thank you for your interest in contributing! This document provides guidelines f
    docker-compose up -d
    ```
 
+   Or link the package into a local n8n instance instead:
+   ```bash
+   npm link
+   cd ~/.n8n/custom
+   npm link n8n-nodes-ynab-api
+   ```
+   Restart n8n after each `npm run build` to pick up the new `dist/`.
+
+## Project Layout
+
+```
+.
+├── credentials/
+│   └── YnabApi.credentials.ts      # YNAB API credentials definition
+├── nodes/
+│   └── Ynab/
+│       ├── Ynab.node.ts            # Main node implementation
+│       ├── Ynab.node.json          # Node codex metadata
+│       └── ynab.svg                # Node icon
+├── examples/                       # Importable example workflows
+├── dist/                           # Compiled JavaScript (generated)
+├── package.json                    # Node package configuration
+└── tsconfig.json                   # TypeScript configuration
+```
+
 ## Code Style
 
 - This project uses TypeScript
