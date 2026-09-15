@@ -7,7 +7,4 @@ module.exports = {
 	},
 	plugins: ['n8n-nodes-base'],
 	extends: ['plugin:n8n-nodes-base/community'],
-	rules: {
-		'n8n-nodes-base/node-param-default-wrong-for-simplify': 'off',
-	},
 };

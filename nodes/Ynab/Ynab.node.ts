@@ -1,4 +1,7 @@
+import { createHash } from 'node:crypto';
+
 import {
+	NodeConnectionTypes,
 	NodeOperationError,
 	INodeType,
 	INodeTypeDescription,
@@ -13,8 +16,13 @@ import {
 	IHttpRequestOptions,
 } from 'n8n-workflow';
 
+type LocatorItem = { id: string; name: string };
+type LocatorCacheEntry = { fetchedAt: number; items: LocatorItem[] };
+
 export class Ynab implements INodeType {
 	private static readonly LOCATOR_CACHE_TTL_MS = 300_000;
+
+	private static readonly LOCATOR_CACHE_MAX_ENTRIES = 500;
 
 	private static getLocatorValue(input: unknown): string {
 		if (typeof input === 'string') return input.trim();
@@ -32,11 +40,67 @@ export class Ynab implements INodeType {
 		return '';
 	}
 
-	private static locatorCache = {
-		plans: null as null | { fetchedAt: number; items: Array<{ id: string; name: string }> },
-		accountsByPlan: {} as Record<string, { fetchedAt: number; items: Array<{ id: string; name: string }> }>,
-		categoriesByPlan: {} as Record<string, { fetchedAt: number; items: Array<{ id: string; name: string }> }>,
-	};
+	private static locatorCache = new Map<string, LocatorCacheEntry>();
+
+	/**
+	 * Builds the cache-key prefix for the credential currently in use.
+	 *
+	 * n8n instantiates one node class per process and shares it across every
+	 * workflow and user on the instance, so cache keys must be scoped to the
+	 * credential. Without this, one user's plan, account and category names
+	 * would be served from cache to anyone else on the same instance.
+	 *
+	 * The access token is hashed rather than used directly so the plaintext
+	 * token is never held as a map key. Returns null when no token is
+	 * available, which disables caching rather than sharing an unscoped key.
+	 */
+	private static async getCacheScope(context: ILoadOptionsFunctions): Promise<string | null> {
+		try {
+			const credentials = await context.getCredentials('ynabApi');
+			const accessToken = String(credentials?.accessToken ?? '');
+			if (!accessToken) return null;
+
+			return createHash('sha256').update(accessToken).digest('hex').slice(0, 32);
+		} catch {
+			return null;
+		}
+	}
+
+	private static readLocatorCache(key: string | null): LocatorItem[] | undefined {
+		if (!key) return undefined;
+
+		const entry = Ynab.locatorCache.get(key);
+		if (!entry) return undefined;
+
+		if (Date.now() - entry.fetchedAt >= Ynab.LOCATOR_CACHE_TTL_MS) {
+			Ynab.locatorCache.delete(key);
+			return undefined;
+		}
+
+		return entry.items;
+	}
+
+	private static writeLocatorCache(key: string | null, items: LocatorItem[]): void {
+		if (!key) return;
+
+		const now = Date.now();
+
+		// Evict expired entries first, then oldest-inserted, so an instance with
+		// many credentials cannot grow the cache without bound.
+		for (const [existingKey, entry] of Ynab.locatorCache) {
+			if (now - entry.fetchedAt >= Ynab.LOCATOR_CACHE_TTL_MS) {
+				Ynab.locatorCache.delete(existingKey);
+			}
+		}
+
+		while (Ynab.locatorCache.size >= Ynab.LOCATOR_CACHE_MAX_ENTRIES) {
+			const oldestKey = Ynab.locatorCache.keys().next().value;
+			if (oldestKey === undefined) break;
+			Ynab.locatorCache.delete(oldestKey);
+		}
+
+		Ynab.locatorCache.set(key, { fetchedAt: now, items });
+	}
 
 	description: INodeTypeDescription = {
 		displayName: 'YNAB',
@@ -49,9 +113,8 @@ export class Ynab implements INodeType {
 		defaults: {
 			name: 'YNAB',
 		},
-		inputs: ['main'],
-		outputs: ['main'],
-		// @ts-ignore - usableAsTool is not in the type definition yet but is supported
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		usableAsTool: true,
 		credentials: [
 			{
@@ -2951,13 +3014,11 @@ export class Ynab implements INodeType {
 				this: ILoadOptionsFunctions,
 				filter?: string,
 			): Promise<INodeListSearchResult> {
-				const now = Date.now();
-				const plansCache = Ynab.locatorCache.plans;
-				let plans: Array<{ id: string; name: string }> = [];
+				const scope = await Ynab.getCacheScope(this);
+				const cacheKey = scope ? `${scope}:plans` : null;
+				let plans = Ynab.readLocatorCache(cacheKey);
 
-				if (plansCache && now - plansCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
-					plans = plansCache.items;
-				} else {
+				if (!plans) {
 					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
 						url: 'https://api.ynab.com/v1/plans',
 						method: 'GET',
@@ -2971,10 +3032,7 @@ export class Ynab implements INodeType {
 							name: String(plan.name || plan.id),
 						})));
 
-					Ynab.locatorCache.plans = {
-						fetchedAt: now,
-						items: plans,
-					};
+					Ynab.writeLocatorCache(cacheKey, plans);
 				}
 
 				const normalizedFilter = (filter || '').toLowerCase();
@@ -3008,13 +3066,11 @@ export class Ynab implements INodeType {
 					return { results: [] };
 				}
 
-				const now = Date.now();
-				const accountCache = Ynab.locatorCache.accountsByPlan[planId];
-				let accounts: Array<{ id: string; name: string }> = [];
+				const scope = await Ynab.getCacheScope(this);
+				const cacheKey = scope ? `${scope}:accounts:${planId}` : null;
+				let accounts = Ynab.readLocatorCache(cacheKey);
 
-				if (accountCache && now - accountCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
-					accounts = accountCache.items;
-				} else {
+				if (!accounts) {
 					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
 						url: `https://api.ynab.com/v1/plans/${planId}/accounts`,
 						method: 'GET',
@@ -3028,10 +3084,7 @@ export class Ynab implements INodeType {
 							name: String(account.name || account.id),
 						})));
 
-					Ynab.locatorCache.accountsByPlan[planId] = {
-						fetchedAt: now,
-						items: accounts,
-					};
+					Ynab.writeLocatorCache(cacheKey, accounts);
 				}
 
 				const normalizedFilter = (filter || '').toLowerCase();
@@ -3065,13 +3118,11 @@ export class Ynab implements INodeType {
 					return { results: [] };
 				}
 
-				const now = Date.now();
-				const categoryCache = Ynab.locatorCache.categoriesByPlan[planId];
-				let categories: Array<{ id: string; name: string }> = [];
+				const scope = await Ynab.getCacheScope(this);
+				const cacheKey = scope ? `${scope}:categories:${planId}` : null;
+				let categories = Ynab.readLocatorCache(cacheKey);
 
-				if (categoryCache && now - categoryCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
-					categories = categoryCache.items;
-				} else {
+				if (!categories) {
 					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
 						url: `https://api.ynab.com/v1/plans/${planId}/categories`,
 						method: 'GET',
@@ -3083,6 +3134,8 @@ export class Ynab implements INodeType {
 							(group) => group && typeof group === 'object',
 						);
 
+					const collected: LocatorItem[] = [];
+
 					for (const group of categoryGroups) {
 						const groupName = String(group.name || '').trim();
 						const groupCategories = ((group.categories as IDataObject[]) || []).filter(
@@ -3091,17 +3144,15 @@ export class Ynab implements INodeType {
 
 						for (const category of groupCategories) {
 							const categoryName = String(category.name || category.id).trim();
-							categories.push({
+							collected.push({
 								id: String(category.id),
 								name: groupName ? `${groupName} / ${categoryName}` : categoryName,
 							});
 						}
 					}
 
-					Ynab.locatorCache.categoriesByPlan[planId] = {
-						fetchedAt: now,
-						items: categories,
-					};
+					categories = collected;
+					Ynab.writeLocatorCache(cacheKey, categories);
 				}
 
 				const normalizedFilter = (filter || '').toLowerCase();
