@@ -1,5 +1,5 @@
 {
-	"node": "n8n-nodes-base.ynab",
+	"node": "n8n-nodes-ynab-api.ynab",
 	"nodeVersion": "1.0",
 	"codexVersion": "1.0",
 	"categories": ["Finance & Accounting"],

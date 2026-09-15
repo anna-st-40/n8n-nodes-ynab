@@ -1,4 +1,4 @@
-# Installing n8n-nodes-YNAB on Docker n8n
+# Installing n8n-nodes-ynab on Docker n8n
 
 This guide shows you how to install the YNAB custom node on a Docker-based n8n server.
 
@@ -18,8 +18,8 @@ ssh user@your-server-ip
 cd /opt
 
 # Clone the repository
-git clone https://github.com/Npab19/n8n-nodes-YNAB.git
-cd n8n-nodes-YNAB
+git clone https://github.com/anna-st-40/n8n-nodes-ynab.git
+cd n8n-nodes-ynab
 
 # Install dependencies and build
 npm install
@@ -44,7 +44,7 @@ services:
       - N8N_CUSTOM_EXTENSIONS=/data/custom
     volumes:
       - n8n_data:/home/node/.n8n
-      - /opt/n8n-nodes-YNAB:/data/custom/n8n-nodes-YNAB  # Add this line
+      - /opt/n8n-nodes-ynab:/data/custom/n8n-nodes-ynab  # Add this line
     restart: unless-stopped
 
 volumes:
@@ -80,11 +80,11 @@ USER root
 
 # Install the YNAB node
 RUN cd /usr/local/lib/node_modules && \
-    git clone https://github.com/Npab19/n8n-nodes-YNAB.git n8n-nodes-ynab && \
-    cd n8n-nodes-ynab && \
+    git clone https://github.com/anna-st-40/n8n-nodes-ynab.git n8n-nodes-ynab-api && \
+    cd n8n-nodes-ynab-api && \
     npm install --omit=dev && \
     npm run build && \
-    chown -R node:node /usr/local/lib/node_modules/n8n-nodes-ynab
+    chown -R node:node /usr/local/lib/node_modules/n8n-nodes-ynab-api
 
 USER node
 
@@ -137,8 +137,8 @@ If you already have n8n running and want to install the node without rebuilding:
 
 ```bash
 cd /opt
-git clone https://github.com/Npab19/n8n-nodes-YNAB.git
-cd n8n-nodes-YNAB
+git clone https://github.com/anna-st-40/n8n-nodes-ynab.git
+cd n8n-nodes-ynab
 npm install
 npm run build
 ```
@@ -150,10 +150,10 @@ npm run build
 docker ps | grep n8n
 
 # Copy the built node into the container
-docker cp /opt/n8n-nodes-YNAB n8n_container_name:/home/node/.n8n/custom/
+docker cp /opt/n8n-nodes-ynab n8n_container_name:/home/node/.n8n/custom/
 
 # Fix permissions
-docker exec -u root n8n_container_name chown -R node:node /home/node/.n8n/custom/n8n-nodes-YNAB
+docker exec -u root n8n_container_name chown -R node:node /home/node/.n8n/custom/n8n-nodes-ynab
 
 # Restart the container
 docker restart n8n_container_name
@@ -178,8 +178,8 @@ Look for a mount like `/home/node/.n8n/custom`
 # Example: /var/lib/n8n/custom
 
 cd /var/lib/n8n/custom  # Adjust to your path
-git clone https://github.com/Npab19/n8n-nodes-YNAB.git
-cd n8n-nodes-YNAB
+git clone https://github.com/anna-st-40/n8n-nodes-ynab.git
+cd n8n-nodes-ynab
 npm install
 npm run build
 ```
@@ -232,11 +232,11 @@ docker restart n8n_container_name
 If npm install fails in the container:
 ```bash
 # Build on host, then copy just the dist folder
-cd /opt/n8n-nodes-YNAB
+cd /opt/n8n-nodes-ynab
 npm install
 npm run build
-docker cp dist n8n_container_name:/home/node/.n8n/custom/n8n-nodes-YNAB/
-docker cp package.json n8n_container_name:/home/node/.n8n/custom/n8n-nodes-YNAB/
+docker cp dist n8n_container_name:/home/node/.n8n/custom/n8n-nodes-ynab/
+docker cp package.json n8n_container_name:/home/node/.n8n/custom/n8n-nodes-ynab/
 ```
 
 ## Configuration
@@ -256,7 +256,7 @@ To update to the latest version:
 
 ```bash
 # On your Docker host
-cd /opt/n8n-nodes-YNAB
+cd /opt/n8n-nodes-ynab
 git pull
 npm install
 npm run build
@@ -288,7 +288,7 @@ services:
       - WEBHOOK_URL=https://your-domain.com/
     volumes:
       - n8n_data:/home/node/.n8n
-      - /opt/n8n-nodes-YNAB:/home/node/.n8n/custom/n8n-nodes-YNAB
+      - /opt/n8n-nodes-ynab:/home/node/.n8n/custom/n8n-nodes-ynab
     restart: unless-stopped
 
 volumes:
@@ -297,6 +297,6 @@ volumes:
 
 ## Need Help?
 
-- **Documentation**: https://github.com/Npab19/n8n-nodes-YNAB
-- **Issues**: https://github.com/Npab19/n8n-nodes-YNAB/issues
+- **Documentation**: https://github.com/anna-st-40/n8n-nodes-ynab
+- **Issues**: https://github.com/anna-st-40/n8n-nodes-ynab/issues
 - **n8n Docs**: https://docs.n8n.io/hosting/installation/docker/

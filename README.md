@@ -1,8 +1,19 @@
-# n8n-nodes-ynab
+<img src="https://cdn.prod.website-files.com/640f69143ec11b21d42015c6/6758a5396561162bbe65ae5c_524ab88af6960dd452642470297f8130_Tree%20Logo%20Blurple%20(2).svg" alt="YNAB logo" width="96">
 
-![YNAB Logo](https://cdn.prod.website-files.com/640f69143ec11b21d42015c6/6758a5396561162bbe65ae5c_524ab88af6960dd452642470297f8130_Tree%20Logo%20Blurple%20(2).svg)
+# n8n-nodes-ynab-api
 
-Custom n8n node for YNAB (You Need A Budget) API integration. This node allows you to interact with your YNAB plans, accounts, categories, payees, payee locations, months, money movements, transactions, and scheduled transactions directly from n8n workflows.
+Community n8n node for the YNAB (You Need A Budget) API — work with your plans, accounts, categories, payees, payee locations, months, money movements, transactions, and scheduled transactions directly from n8n workflows.
+
+## Why this node
+
+- **Complete API coverage** — every endpoint in the current YNAB API v1, including money movements, category groups, payee locations, bulk transaction updates, and transaction import.
+- **Searchable resource pickers** — plans, accounts, categories, and payees use n8n resource locators, so you can search by name, pick from a list, or paste an ID instead of hunting through a flat dropdown.
+- **Works as an AI Agent tool** — the node sets `usableAsTool`, so an n8n AI Agent can call any YNAB operation directly.
+- **Current API terminology** — tracks YNAB's rename of Budgets to Plans.
+
+## Attribution
+
+This project is a fork of [Npab19/n8n-nodes-YNAB](https://github.com/Npab19/n8n-nodes-YNAB) by Nikko Pabion, used under the MIT License. It was forked to bring the node up to full parity with the current YNAB API; the fork rewrites most of the node implementation, adds the remaining resources and operations, and converts the ID fields to resource locators.
 
 ## Features
 
@@ -29,11 +40,9 @@ Uses YNAB Personal Access Token for authentication.
 
 #### Option 1: Install via npm (Recommended)
 
-Once published to npm, you can install this node directly in n8n:
-
 1. Go to **Settings** > **Community Nodes**
 2. Click **Install**
-3. Enter `n8n-nodes-ynab-npab19`
+3. Enter `n8n-nodes-ynab-api`
 4. Click **Install**
 
 #### Option 2: Manual Installation
@@ -45,7 +54,7 @@ For self-hosted n8n instances:
 cd ~/.n8n/custom
 
 # Clone this repository
-git clone https://github.com/YOUR_USERNAME/n8n-nodes-ynab.git
+git clone https://github.com/anna-st-40/n8n-nodes-ynab.git
 
 # Install dependencies and build
 cd n8n-nodes-ynab
@@ -59,7 +68,7 @@ npm run build
 
 1. Clone this repository:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/n8n-nodes-ynab.git
+   git clone https://github.com/anna-st-40/n8n-nodes-ynab.git
    cd n8n-nodes-ynab
    ```
 
@@ -77,7 +86,7 @@ npm run build
    ```bash
    npm link
    cd ~/.n8n/custom
-   npm link n8n-nodes-ynab
+   npm link n8n-nodes-ynab-api
    ```
 
 5. Start your local n8n instance and test the node
@@ -129,7 +138,7 @@ npm run build
 ## Common Use Cases
 
 ### Budget Monitoring
-- Get all budgets and their balances
+- Get all plans and their balances
 - Monitor spending across categories
 - Track account balances
 - Generate budget reports
@@ -198,11 +207,12 @@ npm run lintfix  # Auto-fix issues
 
 ## License
 
-MIT
+[MIT](LICENSE). Copyright (c) 2025 Nikko Pabion, Copyright (c) 2026 Anna Stefaniv Oickle.
 
 ## Support
 
 For issues and questions:
+- This node: https://github.com/anna-st-40/n8n-nodes-ynab/issues
 - YNAB API: https://api.ynab.com
 - n8n Documentation: https://docs.n8n.io
 

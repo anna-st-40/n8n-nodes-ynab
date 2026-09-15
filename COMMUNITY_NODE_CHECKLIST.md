@@ -1,9 +1,9 @@
 # n8n Community Node Verification Checklist + Compliance Report
 
-Project: n8n-nodes-YNAB  
-Package: n8n-nodes-ynab-npab19  
-Version: 1.2.0  
-Date: 2026-04-03
+Project: n8n-nodes-ynab  
+Package: n8n-nodes-ynab-api  
+Version: 1.0.0  
+Date: 2026-09-15
 
 ## ✅ Technical Requirements
 
@@ -13,7 +13,8 @@ Date: 2026-04-03
 
 ### 2. License
 - [x] **MIT License** - LICENSE file present
-- [x] Copyright holder specified (Nikko Pabion)
+- [x] Copyright holders specified (Nikko Pabion, original; Anna Stefaniv Oickle, fork)
+- [x] Upstream attribution retained in LICENSE and README
 
 ### 3. Dependencies
 - [x] **No Runtime Dependencies** - Only peer dependencies (`n8n-workflow`)
@@ -78,10 +79,11 @@ Date: 2026-04-03
 - [x] **Clean build**: Builds without errors
 - [x] **Linter passes**: No ESLint errors
 - [x] **TypeScript compiles**: No type errors
-- [ ] **Community scanner**: Need to run `npx @n8n/scan-community-package n8n-nodes-ynab-npab19`
+- [ ] **Community scanner**: Need to run `npx @n8n/scan-community-package n8n-nodes-ynab-api` (after first publish)
 
 ### 14. Functionality
-- [x] **6 Resources implemented**: Plan, Account, Transaction, Category, Payee, User
-- [x] **15+ Operations**: Full CRUD operations
+- [x] **10 Resources implemented**: Plan, Account, Category, Payee, Payee Location, Month, Money Movement, Transaction, Scheduled Transaction, User
+- [x] **37 Operations**: Full CRUD, covering all 44 endpoints of YNAB API v1 (scoped list operations map to several endpoints each)
+- [x] **Resource locators**: Plan, Account, Category, and Payee IDs are searchable resource locators
 - [x] **Tested with real API**: Successfully tested with YNAB API
-- [x] **AI Agent compatible**: Declarative style
+- [x] **AI Agent compatible**: Declarative style, `usableAsTool` enabled

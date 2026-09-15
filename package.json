@@ -1,7 +1,7 @@
 {
-  "name": "n8n-nodes-ynab-npab19",
-  "version": "1.2.0",
-  "description": "n8n node for YNAB (You Need A Budget) API integration with AI Agent support for budgets, accounts, transactions, categories, and payees",
+  "name": "n8n-nodes-ynab-api",
+  "version": "1.0.0",
+  "description": "n8n node for the YNAB (You Need A Budget) API with AI Agent support and complete coverage of plans, accounts, categories, payees, payee locations, months, money movements, transactions, and scheduled transactions",
   "keywords": [
     "n8n-community-node-package",
     "n8n",
@@ -15,14 +15,17 @@
     "budgeting"
   ],
   "license": "MIT",
-  "homepage": "https://github.com/Npab19/n8n-nodes-YNAB#readme",
+  "homepage": "https://github.com/anna-st-40/n8n-nodes-ynab#readme",
   "author": {
-    "name": "Nikko Pabion",
-    "email": "npab19@gmail.com"
+    "name": "Anna Stefaniv Oickle",
+    "email": "anna.stefaniv.oickle@gmail.com"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/Npab19/n8n-nodes-YNAB.git"
+    "url": "git+https://github.com/anna-st-40/n8n-nodes-ynab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/anna-st-40/n8n-nodes-ynab/issues"
   },
   "main": "index.js",
   "scripts": {

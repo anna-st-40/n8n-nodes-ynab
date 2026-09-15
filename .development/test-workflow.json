@@ -20,7 +20,7 @@
       },
       "id": "ynab-node",
       "name": "YNAB - Get All Plans",
-      "type": "n8n-nodes-ynab.ynab",
+      "type": "n8n-nodes-ynab-api.ynab",
       "typeVersion": 1,
       "position": [
         450,
