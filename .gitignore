@@ -43,6 +43,9 @@ test-*.js
 test-*.sh
 install-node.sh
 
+# Vendor API spec, kept locally as a reference but not redistributed
+YNAB_open_api_spec.yaml
+
 # Temporary files
 *.tmp
 *.temp

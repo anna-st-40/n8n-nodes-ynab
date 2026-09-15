@@ -1,5 +1,5 @@
 {
-  "name": "YNAB Test - Get Plans",
+  "name": "YNAB - Get All Plans",
   "nodes": [
     {
       "parameters": {},

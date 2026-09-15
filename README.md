@@ -1,4 +1,4 @@
-<img src="https://cdn.prod.website-files.com/640f69143ec11b21d42015c6/6758a5396561162bbe65ae5c_524ab88af6960dd452642470297f8130_Tree%20Logo%20Blurple%20(2).svg" alt="YNAB logo" width="96">
+<img src="nodes/Ynab/ynab.svg" alt="YNAB logo" width="96">
 
 # n8n-nodes-ynab-api
 
@@ -111,6 +111,8 @@ npm run build
 
 ### Example Workflow: Get All Plans
 
+A ready-to-import version of this workflow is in [examples/get-all-plans.json](examples/get-all-plans.json) — import it from **Workflows** > **Import from File**, then select your credentials.
+
 1. Add a "Manual Trigger" node
 2. Add a "YNAB" node
 3. Configure the YNAB node:
@@ -180,8 +182,8 @@ This node implements the YNAB API v1. For more information about YNAB API:
 │       ├── Ynab.node.ts            # Main node implementation
 │       ├── Ynab.node.json          # Node codex metadata
 │       └── ynab.svg                # Node icon
+├── examples/                       # Importable example workflows
 ├── dist/                           # Compiled JavaScript (generated)
-├── .development/                   # Development test files
 ├── package.json                    # Node package configuration
 └── tsconfig.json                   # TypeScript configuration
 ```
@@ -202,12 +204,14 @@ npm run lintfix  # Auto-fix issues
 ## Compatibility
 
 - **n8n version**: 1.110.1+
-- **Node.js**: 18.17.0+
+- **Node.js**: 20.19+
 - **YNAB API**: v1
 
 ## License
 
 [MIT](LICENSE). Copyright (c) 2025 Nikko Pabion, Copyright (c) 2026 Anna Stefaniv Oickle.
+
+See [NOTICE](NOTICE) for fork attribution and trademark information.
 
 ## Support
 

@@ -1,0 +1,15 @@
+n8n-nodes-ynab-api
+Copyright (c) 2026 Anna Stefaniv Oickle
+
+This project is a fork of https://github.com/Npab19/n8n-nodes-YNAB, originally
+created by Nikko Pabion (Copyright (c) 2025) and used here under the terms of
+the MIT License. Both copyright holders are named in the LICENSE file.
+
+The fork brings the node up to full parity with the current YNAB API: it
+rewrites most of the node implementation, adds the remaining resources and
+operations, and converts the ID fields to resource locators.
+
+"YNAB" and "You Need A Budget" are trademarks of You Need A Budget LLC. This
+project is an independent community integration and is not affiliated with,
+endorsed by, or sponsored by You Need A Budget LLC. The YNAB logo is included
+solely to identify the service this node connects to.
