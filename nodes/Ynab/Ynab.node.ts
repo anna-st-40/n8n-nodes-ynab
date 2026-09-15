@@ -1,15 +1,43 @@
 import {
+	NodeOperationError,
 	INodeType,
 	INodeTypeDescription,
+	INodeListSearchItems,
+	INodeListSearchResult,
 	INodeExecutionData,
 	IExecuteFunctions,
 	IExecuteSingleFunctions,
+	ILoadOptionsFunctions,
 	IDataObject,
 	IHttpRequestMethods,
 	IHttpRequestOptions,
 } from 'n8n-workflow';
 
 export class Ynab implements INodeType {
+	private static readonly LOCATOR_CACHE_TTL_MS = 300_000;
+
+	private static getLocatorValue(input: unknown): string {
+		if (typeof input === 'string') return input.trim();
+		if (!input || typeof input !== 'object') return '';
+
+		const candidate = input as { value?: unknown; id?: unknown };
+		if (typeof candidate.value === 'string') return candidate.value.trim();
+		if (typeof candidate.id === 'string') return candidate.id.trim();
+		if (candidate.value && typeof candidate.value === 'object') {
+			const nested = candidate.value as { id?: unknown; value?: unknown };
+			if (typeof nested.id === 'string') return nested.id.trim();
+			if (typeof nested.value === 'string') return nested.value.trim();
+		}
+
+		return '';
+	}
+
+	private static locatorCache = {
+		plans: null as null | { fetchedAt: number; items: Array<{ id: string; name: string }> },
+		accountsByPlan: {} as Record<string, { fetchedAt: number; items: Array<{ id: string; name: string }> }>,
+		categoriesByPlan: {} as Record<string, { fetchedAt: number; items: Array<{ id: string; name: string }> }>,
+	};
+
 	description: INodeTypeDescription = {
 		displayName: 'YNAB',
 		name: 'ynab',
@@ -46,16 +74,12 @@ export class Ynab implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
-						name: 'Budget',
-						value: 'budget',
+						name: 'Plan',
+						value: 'plan',
 					},
 					{
 						name: 'Account',
 						value: 'account',
-					},
-					{
-						name: 'Transaction',
-						value: 'transaction',
 					},
 					{
 						name: 'Category',
@@ -66,14 +90,34 @@ export class Ynab implements INodeType {
 						value: 'payee',
 					},
 					{
+						name: 'Payee Location',
+						value: 'payeeLocation',
+					},
+					{
+						name: 'Month',
+						value: 'month',
+					},
+					{
+						name: 'Money Movement',
+						value: 'moneyMovement',
+					},
+					{
+						name: 'Transaction',
+						value: 'transaction',
+					},
+					{
+						name: 'Scheduled Transaction',
+						value: 'scheduledTransaction',
+					},
+					{
 						name: 'User',
 						value: 'user',
 					},
 				],
-				default: 'budget',
+				default: 'plan',
 			},
 
-			// Budget Operations
+			// Plan Operations
 			{
 				displayName: 'Operation',
 				name: 'operation',
@@ -81,26 +125,26 @@ export class Ynab implements INodeType {
 				noDataExpression: true,
 				displayOptions: {
 					show: {
-						resource: ['budget'],
+						resource: ['plan'],
 					},
 				},
 				options: [
 					{
 						name: 'Get All',
 						value: 'getAll',
-						description: 'Get all budgets',
-						action: 'Get all budgets',
+						description: 'Get all plans',
+						action: 'Get all plans',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '/budgets',
+								url: '/plans',
 							},
 							output: {
 								postReceive: [
 									{
 										type: 'rootProperty',
 										properties: {
-											property: 'data.budgets',
+											property: 'data.plans',
 										},
 									},
 								],
@@ -110,19 +154,19 @@ export class Ynab implements INodeType {
 					{
 						name: 'Get',
 						value: 'get',
-						description: 'Get a single budget',
-						action: 'Get a budget',
+						description: 'Get a single plan',
+						action: 'Get a plan',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}',
+								url: '=/plans/{{$parameter.planId}}',
 							},
 							output: {
 								postReceive: [
 									{
 										type: 'rootProperty',
 										properties: {
-											property: 'data.budget',
+											property: 'data.plan',
 										},
 									},
 								],
@@ -132,12 +176,12 @@ export class Ynab implements INodeType {
 					{
 						name: 'Get Settings',
 						value: 'getSettings',
-						description: 'Get budget settings',
-						action: 'Get budget settings',
+						description: 'Get plan settings',
+						action: 'Get plan settings',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/settings',
+								url: '=/plans/{{$parameter.planId}}/settings',
 							},
 							output: {
 								postReceive: [
@@ -155,18 +199,39 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
-				type: 'string',
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
-						resource: ['budget'],
+						resource: ['plan'],
 						operation: ['get', 'getSettings'],
 					},
 				},
-				default: '',
-				description: 'The ID of the budget',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
 				displayName: 'Include Accounts',
@@ -174,12 +239,12 @@ export class Ynab implements INodeType {
 				type: 'boolean',
 				displayOptions: {
 					show: {
-						resource: ['budget'],
+						resource: ['plan'],
 						operation: ['getAll'],
 					},
 				},
 				default: false,
-				description: 'Whether to include the list of budget accounts',
+				description: 'Whether to include the list of plan accounts',
 				routing: {
 					request: {
 						qs: {
@@ -187,6 +252,36 @@ export class Ynab implements INodeType {
 						},
 					},
 				},
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['plan'],
+						operation: ['get'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
 			},
 
 			// Account Operations
@@ -204,12 +299,12 @@ export class Ynab implements INodeType {
 					{
 						name: 'Get All',
 						value: 'getAll',
-						description: 'Get all accounts for a budget',
+						description: 'Get all accounts for a plan',
 						action: 'Get all accounts',
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/accounts',
+								url: '=/plans/{{$parameter.planId}}/accounts',
 							},
 							output: {
 								postReceive: [
@@ -231,7 +326,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/accounts/{{$parameter.accountId}}',
+								url: '=/plans/{{$parameter.planId}}/accounts/{{$parameter.accountId}}',
 							},
 							output: {
 								postReceive: [
@@ -253,7 +348,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'POST',
-								url: '=/budgets/{{$parameter.budgetId}}/accounts',
+								url: '=/plans/{{$parameter.planId}}/accounts',
 							},
 							send: {
 								type: 'body',
@@ -293,22 +388,73 @@ export class Ynab implements INodeType {
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
-				type: 'string',
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['account'],
 					},
 				},
-				default: '',
-				description: 'The ID of the budget',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
-				displayName: 'Account ID',
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['account'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Account',
 				name: 'accountId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -316,8 +462,29 @@ export class Ynab implements INodeType {
 						operation: ['get'],
 					},
 				},
-				default: '',
-				description: 'The ID of the account',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
 			},
 			{
 				displayName: 'Account Name',
@@ -391,7 +558,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions',
+								url: '={{(() => { const planPath = "/plans/" + $parameter.planId; switch ($parameter.transactionListScope || "plan") { case "account": return planPath + "/accounts/" + $parameter.transactionAccountId + "/transactions"; case "category": return planPath + "/categories/" + $parameter.transactionCategoryId + "/transactions"; case "payee": return planPath + "/payees/" + $parameter.transactionPayeeId + "/transactions"; case "month": return planPath + "/months/" + $parameter.transactionMonth + "/transactions"; default: return planPath + "/transactions"; } })() }}',
 							},
 							output: {
 								postReceive: [
@@ -413,7 +580,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions/{{$parameter.transactionId}}',
+								url: '=/plans/{{$parameter.planId}}/transactions/{{$parameter.transactionId}}',
 							},
 							output: {
 								postReceive: [
@@ -435,7 +602,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'POST',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions',
+								url: '=/plans/{{$parameter.planId}}/transactions',
 							},
 							send: {
 								type: 'body',
@@ -445,15 +612,28 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
+										const payeeName = (
+											this.getNodeParameter('payeeName') as string
+										).trim();
+										const memo = (this.getNodeParameter('memo') as string).trim();
+
+										const transaction: IDataObject = {
+											account_id: this.getNodeParameter('accountId') as string,
+											date: this.getNodeParameter('date') as string,
+											amount: this.getNodeParameter('amount') as number,
+											cleared: this.getNodeParameter('cleared', 'uncleared') as string,
+										};
+
+										if (payeeName) {
+											transaction.payee_name = payeeName;
+										}
+
+										if (memo) {
+											transaction.memo = memo;
+										}
+
 										const body = {
-											transaction: {
-												account_id: this.getNodeParameter('accountId') as string,
-												date: this.getNodeParameter('date') as string,
-												amount: this.getNodeParameter('amount') as number,
-												payee_name: this.getNodeParameter('payeeName', '') as string,
-												memo: this.getNodeParameter('memo', '') as string,
-												cleared: this.getNodeParameter('cleared', 'uncleared') as string,
-											},
+											transaction,
 										};
 										return {
 											...requestOptions,
@@ -482,7 +662,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'PUT',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions/{{$parameter.transactionId}}',
+								url: '=/plans/{{$parameter.planId}}/transactions/{{$parameter.transactionId}}',
 							},
 							send: {
 								type: 'body',
@@ -492,15 +672,28 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
+										const payeeName = (
+											this.getNodeParameter('payeeName') as string
+										).trim();
+										const memo = (this.getNodeParameter('memo') as string).trim();
+
+										const transaction: IDataObject = {
+											account_id: this.getNodeParameter('accountId') as string,
+											date: this.getNodeParameter('date') as string,
+											amount: this.getNodeParameter('amount') as number,
+											cleared: this.getNodeParameter('cleared', 'uncleared') as string,
+										};
+
+										if (payeeName) {
+											transaction.payee_name = payeeName;
+										}
+
+										if (memo) {
+											transaction.memo = memo;
+										}
+
 										const body = {
-											transaction: {
-												account_id: this.getNodeParameter('accountId') as string,
-												date: this.getNodeParameter('date') as string,
-												amount: this.getNodeParameter('amount') as number,
-												payee_name: this.getNodeParameter('payeeName', '') as string,
-												memo: this.getNodeParameter('memo', '') as string,
-												cleared: this.getNodeParameter('cleared', 'uncleared') as string,
-											},
+											transaction,
 										};
 										return {
 											...requestOptions,
@@ -529,7 +722,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'DELETE',
-								url: '=/budgets/{{$parameter.budgetId}}/transactions/{{$parameter.transactionId}}',
+								url: '=/plans/{{$parameter.planId}}/transactions/{{$parameter.transactionId}}',
 							},
 							output: {
 								postReceive: [
@@ -543,21 +736,341 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						name: 'Update Multiple',
+						value: 'updateMultiple',
+						description: 'Update multiple transactions',
+						action: 'Update multiple transactions',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/transactions',
+							},
+							send: {
+								type: 'body',
+								property: 'transactions',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const rawTransactions = String(
+											this.getNodeParameter('transactionsJson') || '',
+										).trim();
+
+										if (!rawTransactions) {
+											throw new NodeOperationError(this.getNode(), 'Transactions JSON is required');
+										}
+
+										let transactions: IDataObject[];
+										try {
+											transactions = JSON.parse(rawTransactions) as IDataObject[];
+										} catch {
+											throw new NodeOperationError(this.getNode(), 'Invalid JSON supplied for transactions');
+										}
+
+										if (!Array.isArray(transactions)) {
+											throw new NodeOperationError(this.getNode(), 'Transactions must be a JSON array');
+										}
+
+										return {
+											...requestOptions,
+											body: { transactions },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.transactions',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Import',
+						value: 'import',
+						description: 'Import transactions',
+						action: 'Import transactions',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/transactions/import',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data',
+										},
+									},
+								],
+							},
+						},
+					},
 				],
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
-				type: 'string',
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['transaction'],
 					},
 				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Scope',
+				name: 'transactionListScope',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+					},
+				},
+				options: [
+					{
+						name: 'Plan',
+						value: 'plan',
+						description: 'Return all plan transactions',
+					},
+					{
+						name: 'Account',
+						value: 'account',
+						description: 'Return transactions for a single account',
+					},
+					{
+						name: 'Category',
+						value: 'category',
+						description: 'Return transactions for a single category',
+					},
+					{
+						name: 'Payee',
+						value: 'payee',
+						description: 'Return transactions for a single payee',
+					},
+					{
+						name: 'Month',
+						value: 'month',
+						description: 'Return transactions for a specific month',
+					},
+				],
+				default: 'plan',
+				description:
+					'Select which transactions endpoint to query. Plan is the default and returns all non-pending transactions for the plan. The other scopes require a target ID or month and map to the account, category, payee, or month-specific list endpoints from the API.',
+			},
+			{
+				displayName: 'Account',
+				name: 'transactionAccountId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['account'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
+			},
+			{
+				displayName: 'Category',
+				name: 'transactionCategoryId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['category'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchCategories',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select a category from the selected plan or enter a category ID',
+			},
+			{
+				displayName: 'Payee ID',
+				name: 'transactionPayeeId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['payee'],
+					},
+				},
 				default: '',
-				description: 'The ID of the budget',
+				description: 'The ID of the payee',
+			},
+			{
+				displayName: 'Month',
+				name: 'transactionMonth',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+						transactionListScope: ['month'],
+					},
+				},
+				default: '',
+				description: 'The plan month in ISO format (YYYY-MM-DD) or current',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+					{
+						displayName: 'Since Date',
+						name: 'sinceDate',
+						type: 'string',
+						default: '',
+						description:
+							'Only transactions on or after this ISO date (YYYY-MM-DD) are returned',
+						routing: {
+							request: {
+								qs: {
+									since_date: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+					{
+						displayName: 'Type',
+						name: 'transactionType',
+						type: 'options',
+						options: [
+							{ name: 'None', value: '' },
+							{ name: 'Uncategorized', value: 'uncategorized' },
+							{ name: 'Unapproved', value: 'unapproved' },
+						],
+						default: '',
+						description: 'Filter transactions by transaction type',
+						routing: {
+							request: {
+								qs: {
+									type: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Transactions JSON',
+				name: 'transactionsJson',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['transaction'],
+						operation: ['updateMultiple'],
+					},
+				},
+				default: '[]',
+				placeholder: '[{"id":"...","amount":12345}]',
+				description: 'JSON array of transaction updates',
 			},
 			{
 				displayName: 'Transaction ID',
@@ -574,9 +1087,9 @@ export class Ynab implements INodeType {
 				description: 'The ID of the transaction',
 			},
 			{
-				displayName: 'Account ID',
+				displayName: 'Account',
 				name: 'accountId',
-				type: 'string',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
@@ -584,8 +1097,29 @@ export class Ynab implements INodeType {
 						operation: ['create', 'update'],
 					},
 				},
-				default: '',
-				description: 'The ID of the account',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
 			},
 			{
 				displayName: 'Date',
@@ -680,7 +1214,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/categories',
+								url: '=/plans/{{$parameter.planId}}/categories',
 							},
 							output: {
 								postReceive: [
@@ -702,7 +1236,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/categories/{{$parameter.categoryId}}',
+								url: '=/plans/{{$parameter.planId}}/categories/{{$parameter.categoryId}}',
 							},
 							output: {
 								postReceive: [
@@ -716,35 +1250,504 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a new category',
+						action: 'Create a category',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/categories',
+							},
+							send: {
+								type: 'body',
+								property: 'category',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const categoryName = String(this.getNodeParameter('categoryName') || '').trim();
+										const parentCategoryGroupId = String(
+											this.getNodeParameter('parentCategoryGroupId') || '',
+										).trim();
+
+										if (!categoryName) {
+											throw new NodeOperationError(this.getNode(), 'Category name is required');
+										}
+
+										if (!parentCategoryGroupId) {
+											throw new NodeOperationError(this.getNode(), 'Parent category group ID is required');
+										}
+
+										const category: IDataObject = {
+											name: categoryName,
+											category_group_id: parentCategoryGroupId,
+										};
+
+										const note = String(this.getNodeParameter('note') || '').trim();
+										if (note) {
+											category.note = note;
+										}
+
+										const goalTarget = this.getNodeParameter('goalTarget');
+										if (typeof goalTarget === 'number' && Number.isFinite(goalTarget)) {
+											category.goal_target = goalTarget;
+										}
+
+										const goalTargetDate = String(this.getNodeParameter('goalTargetDate') || '').trim();
+										if (goalTargetDate) {
+											category.goal_target_date = goalTargetDate;
+										}
+
+										return {
+											...requestOptions,
+											body: { category },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update',
+						value: 'update',
+						description: 'Update a category',
+						action: 'Update a category',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/categories/{{$parameter.categoryId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'category',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const category: IDataObject = {};
+
+										const categoryName = String(this.getNodeParameter('categoryName') || '').trim();
+										if (categoryName) {
+											category.name = categoryName;
+										}
+
+										const parentCategoryGroupId = String(
+											this.getNodeParameter('parentCategoryGroupId') || '',
+										).trim();
+										if (parentCategoryGroupId) {
+											category.category_group_id = parentCategoryGroupId;
+										}
+
+										const note = String(this.getNodeParameter('note') || '').trim();
+										if (note) {
+											category.note = note;
+										}
+
+										const goalTarget = this.getNodeParameter('goalTarget');
+										if (typeof goalTarget === 'number' && Number.isFinite(goalTarget)) {
+											category.goal_target = goalTarget;
+										}
+
+										const goalTargetDate = String(this.getNodeParameter('goalTargetDate') || '').trim();
+										if (goalTargetDate) {
+											category.goal_target_date = goalTargetDate;
+										}
+
+										return {
+											...requestOptions,
+											body: { category },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get Month',
+						value: 'getMonth',
+						description: 'Get a category for a specific plan month',
+						action: 'Get a month category',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/months/{{$parameter.month}}/categories/{{$parameter.categoryId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update Month',
+						value: 'updateMonth',
+						description: 'Update a category for a specific month',
+						action: 'Update a month category',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/months/{{$parameter.month}}/categories/{{$parameter.categoryId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'category',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										return {
+											...requestOptions,
+											body: {
+												category: {
+													budgeted: this.getNodeParameter('budgeted') as number,
+												},
+											},
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.category',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Create Group',
+						value: 'createGroup',
+						description: 'Create a new category group',
+						action: 'Create a category group',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/category_groups',
+							},
+							send: {
+								type: 'body',
+								property: 'category_group',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const categoryGroupName = String(this.getNodeParameter('categoryGroupName') || '').trim();
+										if (!categoryGroupName) {
+											throw new NodeOperationError(this.getNode(), 'Category group name is required');
+										}
+										return {
+											...requestOptions,
+											body: { category_group: { name: categoryGroupName } },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.category_group' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update Group',
+						value: 'updateGroup',
+						description: 'Update a category group',
+						action: 'Update a category group',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/category_groups/{{$parameter.categoryGroupId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'category_group',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const categoryGroupName = String(this.getNodeParameter('categoryGroupName') || '').trim();
+										if (!categoryGroupName) {
+											throw new NodeOperationError(this.getNode(), 'Category group name is required');
+										}
+										return {
+											...requestOptions,
+											body: { category_group: { name: categoryGroupName } },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.category_group' },
+									},
+								],
+							},
+						},
+					},
 				],
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
-				type: 'string',
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['category'],
 					},
 				},
-				default: '',
-				description: 'The ID of the budget',
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
 			},
 			{
-				displayName: 'Category ID',
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Category Name',
+				name: 'categoryName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The name of the category',
+			},
+			{
+				displayName: 'Parent Category Group ID',
+				name: 'parentCategoryGroupId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The ID of the parent category group',
+			},
+			{
+				displayName: 'Note',
+				name: 'note',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The note for the category',
+			},
+			{
+				displayName: 'Goal Target',
+				name: 'goalTarget',
+				type: 'number',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: 0,
+				description: 'The goal target amount in milliunits format',
+			},
+			{
+				displayName: 'Goal Target Date',
+				name: 'goalTargetDate',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The goal target date in ISO format (YYYY-MM-DD)',
+			},
+			{
+				displayName: 'Category',
 				name: 'categoryId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['get', 'update', 'getMonth', 'updateMonth'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchCategories',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select a category from the selected plan or enter a category ID',
+			},
+			{
+				displayName: 'Month',
+				name: 'month',
 				type: 'string',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['category'],
-						operation: ['get'],
+						operation: ['getMonth', 'updateMonth'],
 					},
 				},
 				default: '',
-				description: 'The ID of the category',
+				description: 'The plan month in ISO format (YYYY-MM-DD) or current',
+			},
+			{
+				displayName: 'Budgeted',
+				name: 'budgeted',
+				type: 'number',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['updateMonth'],
+					},
+				},
+				default: 0,
+				description: 'Assigned amount in milliunits format',
+			},
+			{
+				displayName: 'Category Group Name',
+				name: 'categoryGroupName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['createGroup', 'updateGroup'],
+					},
+				},
+				default: '',
+				description: 'The name of the category group',
+			},
+			{
+				displayName: 'Category Group ID',
+				name: 'categoryGroupId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['category'],
+						operation: ['updateGroup'],
+					},
+				},
+				default: '',
+				description: 'The ID of the category group',
 			},
 
 			// Payee Operations
@@ -767,7 +1770,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/payees',
+								url: '=/plans/{{$parameter.planId}}/payees',
 							},
 							output: {
 								postReceive: [
@@ -789,7 +1792,7 @@ export class Ynab implements INodeType {
 						routing: {
 							request: {
 								method: 'GET',
-								url: '=/budgets/{{$parameter.budgetId}}/payees/{{$parameter.payeeId}}',
+								url: '=/plans/{{$parameter.planId}}/payees/{{$parameter.payeeId}}',
 							},
 							output: {
 								postReceive: [
@@ -803,21 +1806,170 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a new payee',
+						action: 'Create a payee',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/payees',
+							},
+							send: {
+								type: 'body',
+								property: 'payee',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const payeeResourceName = String(
+											this.getNodeParameter('payeeResourceName') || '',
+										).trim();
+										if (!payeeResourceName) {
+											throw new NodeOperationError(this.getNode(), 'Payee name is required');
+										}
+
+										return {
+											...requestOptions,
+											body: { payee: { name: payeeResourceName } },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.payee' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update',
+						value: 'update',
+						description: 'Update a payee',
+						action: 'Update a payee',
+						routing: {
+							request: {
+								method: 'PATCH',
+								url: '=/plans/{{$parameter.planId}}/payees/{{$parameter.payeeId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'payee',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const payeeResourceName = String(
+											this.getNodeParameter('payeeResourceName') || '',
+										).trim();
+										const payee: IDataObject = {};
+										if (payeeResourceName) {
+											payee.name = payeeResourceName;
+										}
+
+										return {
+											...requestOptions,
+											body: { payee },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.payee' },
+									},
+								],
+							},
+						},
+					},
 				],
 				default: 'getAll',
 			},
 			{
-				displayName: 'Budget ID',
-				name: 'budgetId',
-				type: 'string',
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
 				required: true,
 				displayOptions: {
 					show: {
 						resource: ['payee'],
 					},
 				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['payee'],
+						operation: ['getAll'],
+					},
+				},
 				default: '',
-				description: 'The ID of the budget',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Payee Name',
+				name: 'payeeResourceName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['payee'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The name of the payee',
 			},
 			{
 				displayName: 'Payee ID',
@@ -827,11 +1979,930 @@ export class Ynab implements INodeType {
 				displayOptions: {
 					show: {
 						resource: ['payee'],
-						operation: ['get'],
+						operation: ['get', 'update'],
 					},
 				},
 				default: '',
 				description: 'The ID of the payee',
+			},
+
+			// Month Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['month'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all plan months',
+						action: 'Get all plan months',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/months',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.months',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get a single plan month',
+						action: 'Get a plan month',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/months/{{$parameter.month}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.month',
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['month'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['month'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Month',
+				name: 'month',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['month'],
+						operation: ['get'],
+					},
+				},
+				default: '',
+				description: 'The plan month in ISO format (YYYY-MM-DD) or current',
+			},
+
+			// Payee Location Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all payee locations',
+						action: 'Get all payee locations',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '={{$parameter.payeeLocationAdditionalFilters && $parameter.payeeLocationAdditionalFilters.payeeId ? "/plans/" + $parameter.planId + "/payees/" + $parameter.payeeLocationAdditionalFilters.payeeId + "/payee_locations" : "/plans/" + $parameter.planId + "/payee_locations"}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.payee_locations',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get a single payee location',
+						action: 'Get a payee location',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/payee_locations/{{$parameter.payeeLocationId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.payee_location',
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Payee Location ID',
+				name: 'payeeLocationId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+						operation: ['get'],
+					},
+				},
+				default: '',
+				description: 'The ID of the payee location',
+			},
+			{
+				displayName: 'Additional Filters',
+				name: 'payeeLocationAdditionalFilters',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['payeeLocation'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Filter',
+				options: [
+					{
+						displayName: 'Payee ID',
+						name: 'payeeId',
+						type: 'string',
+						default: '',
+						description: 'If provided, get payee locations only for this payee',
+					},
+				],
+				description: 'Optionally filter to payee locations for a specific payee',
+			},
+			// Money Movement Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['moneyMovement'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all money movements',
+						action: 'Get all money movements',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '={{$parameter.moneyMovementAdditionalFilters && $parameter.moneyMovementAdditionalFilters.month ? "/plans/" + $parameter.planId + "/months/" + $parameter.moneyMovementAdditionalFilters.month + "/money_movements" : "/plans/" + $parameter.planId + "/money_movements"}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.money_movements',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get All Groups',
+						value: 'getGroups',
+						description: 'Get all money movement groups',
+						action: 'Get all money movement groups',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '={{$parameter.moneyMovementAdditionalFilters && $parameter.moneyMovementAdditionalFilters.month ? "/plans/" + $parameter.planId + "/months/" + $parameter.moneyMovementAdditionalFilters.month + "/money_movement_groups" : "/plans/" + $parameter.planId + "/money_movement_groups"}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.money_movement_groups',
+										},
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['moneyMovement'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Additional Filters',
+				name: 'moneyMovementAdditionalFilters',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['moneyMovement'],
+						operation: ['getAll', 'getGroups'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Filter',
+				options: [
+					{
+						displayName: 'Month',
+						name: 'month',
+						type: 'string',
+						default: '',
+						description: 'If provided, only data for this month (YYYY-MM-DD or current) is returned',
+					},
+				],
+				description: 'Optional filters for money movement queries',
+			},
+
+			// Scheduled Transaction Operations
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				noDataExpression: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+					},
+				},
+				options: [
+					{
+						name: 'Get All',
+						value: 'getAll',
+						description: 'Get all scheduled transactions',
+						action: 'Get all scheduled transactions',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.scheduled_transactions',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Get',
+						value: 'get',
+						description: 'Get a single scheduled transaction',
+						action: 'Get a scheduled transaction',
+						routing: {
+							request: {
+								method: 'GET',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions/{{$parameter.scheduledTransactionId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: {
+											property: 'data.scheduled_transaction',
+										},
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Create',
+						value: 'create',
+						description: 'Create a scheduled transaction',
+						action: 'Create a scheduled transaction',
+						routing: {
+							request: {
+								method: 'POST',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions',
+							},
+							send: {
+								type: 'body',
+								property: 'scheduled_transaction',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const scheduledAccountId = String(
+											this.getNodeParameter('scheduledAccountId') || '',
+										).trim();
+										const scheduledDate = String(
+											this.getNodeParameter('scheduledDate') || '',
+										).trim();
+										if (!scheduledAccountId) {
+											throw new NodeOperationError(this.getNode(), 'Account is required');
+										}
+										if (!scheduledDate) {
+											throw new NodeOperationError(this.getNode(), 'Date is required');
+										}
+
+										const scheduledAmount = this.getNodeParameter('scheduledAmount', 0) as number;
+										const scheduledPayeeId = String(
+											this.getNodeParameter('scheduledPayeeId', ''),
+										).trim();
+										const scheduledPayeeName = String(
+											this.getNodeParameter('scheduledPayeeName', ''),
+										).trim();
+										const scheduledCategoryId = String(
+											this.getNodeParameter('scheduledCategoryId', ''),
+										).trim();
+										const scheduledMemo = String(
+											this.getNodeParameter('scheduledMemo', ''),
+										).trim();
+										const scheduledFlagColor = String(
+											this.getNodeParameter('scheduledFlagColor', ''),
+										).trim();
+										const scheduledFrequency = String(
+											this.getNodeParameter('scheduledFrequency', ''),
+										).trim();
+
+										const scheduled_transaction: IDataObject = {
+											account_id: scheduledAccountId,
+											date: scheduledDate,
+										};
+
+										if (Number.isFinite(scheduledAmount)) {
+											scheduled_transaction.amount = scheduledAmount;
+										}
+										if (scheduledPayeeId) {
+											scheduled_transaction.payee_id = scheduledPayeeId;
+										}
+										if (scheduledPayeeName) {
+											scheduled_transaction.payee_name = scheduledPayeeName;
+										}
+										if (scheduledCategoryId) {
+											scheduled_transaction.category_id = scheduledCategoryId;
+										}
+										if (scheduledMemo) {
+											scheduled_transaction.memo = scheduledMemo;
+										}
+										if (scheduledFlagColor) {
+											scheduled_transaction.flag_color = scheduledFlagColor;
+										}
+										if (scheduledFrequency) {
+											scheduled_transaction.frequency = scheduledFrequency;
+										}
+
+										return {
+											...requestOptions,
+											body: { scheduled_transaction },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.scheduled_transaction' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Update',
+						value: 'update',
+						description: 'Update a scheduled transaction',
+						action: 'Update a scheduled transaction',
+						routing: {
+							request: {
+								method: 'PUT',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions/{{$parameter.scheduledTransactionId}}',
+							},
+							send: {
+								type: 'body',
+								property: 'scheduled_transaction',
+								preSend: [
+									async function (
+										this: IExecuteSingleFunctions,
+										requestOptions: IHttpRequestOptions,
+									): Promise<IHttpRequestOptions> {
+										const scheduledAccountId = String(
+											this.getNodeParameter('scheduledAccountId') || '',
+										).trim();
+										const scheduledDate = String(
+											this.getNodeParameter('scheduledDate') || '',
+										).trim();
+										if (!scheduledAccountId) {
+											throw new NodeOperationError(this.getNode(), 'Account is required');
+										}
+										if (!scheduledDate) {
+											throw new NodeOperationError(this.getNode(), 'Date is required');
+										}
+
+										const scheduledAmount = this.getNodeParameter('scheduledAmount', 0) as number;
+										const scheduledPayeeId = String(
+											this.getNodeParameter('scheduledPayeeId', ''),
+										).trim();
+										const scheduledPayeeName = String(
+											this.getNodeParameter('scheduledPayeeName', ''),
+										).trim();
+										const scheduledCategoryId = String(
+											this.getNodeParameter('scheduledCategoryId', ''),
+										).trim();
+										const scheduledMemo = String(
+											this.getNodeParameter('scheduledMemo', ''),
+										).trim();
+										const scheduledFlagColor = String(
+											this.getNodeParameter('scheduledFlagColor', ''),
+										).trim();
+										const scheduledFrequency = String(
+											this.getNodeParameter('scheduledFrequency', ''),
+										).trim();
+
+										const scheduled_transaction: IDataObject = {
+											account_id: scheduledAccountId,
+											date: scheduledDate,
+										};
+
+										if (Number.isFinite(scheduledAmount)) {
+											scheduled_transaction.amount = scheduledAmount;
+										}
+										if (scheduledPayeeId) {
+											scheduled_transaction.payee_id = scheduledPayeeId;
+										}
+										if (scheduledPayeeName) {
+											scheduled_transaction.payee_name = scheduledPayeeName;
+										}
+										if (scheduledCategoryId) {
+											scheduled_transaction.category_id = scheduledCategoryId;
+										}
+										if (scheduledMemo) {
+											scheduled_transaction.memo = scheduledMemo;
+										}
+										if (scheduledFlagColor) {
+											scheduled_transaction.flag_color = scheduledFlagColor;
+										}
+										if (scheduledFrequency) {
+											scheduled_transaction.frequency = scheduledFrequency;
+										}
+
+										return {
+											...requestOptions,
+											body: { scheduled_transaction },
+										};
+									},
+								],
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.scheduled_transaction' },
+									},
+								],
+							},
+						},
+					},
+					{
+						name: 'Delete',
+						value: 'delete',
+						description: 'Delete a scheduled transaction',
+						action: 'Delete a scheduled transaction',
+						routing: {
+							request: {
+								method: 'DELETE',
+								url: '=/plans/{{$parameter.planId}}/scheduled_transactions/{{$parameter.scheduledTransactionId}}',
+							},
+							output: {
+								postReceive: [
+									{
+										type: 'rootProperty',
+										properties: { property: 'data.scheduled_transaction' },
+									},
+								],
+							},
+						},
+					},
+				],
+				default: 'getAll',
+			},
+			{
+				displayName: 'Plan',
+				name: 'planId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchPlans',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. last-used',
+					},
+				],
+				description: 'Select a plan from the list or enter a plan ID',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'additionalFields',
+				type: 'collection',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['getAll'],
+					},
+				},
+				default: '',
+				placeholder: 'Add Field',
+				options: [
+					{
+						displayName: 'Last Knowledge of Server',
+						name: 'lastKnowledgeOfServer',
+						type: 'string',
+						default: '',
+						description:
+							'If provided, only entities changed since this server knowledge value are returned',
+						routing: {
+							request: {
+								qs: {
+									last_knowledge_of_server: '={{$value || undefined}}',
+								},
+							},
+						},
+					},
+				],
+			},
+			{
+				displayName: 'Scheduled Transaction ID',
+				name: 'scheduledTransactionId',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['get', 'update', 'delete'],
+					},
+				},
+				default: '',
+				description: 'The ID of the scheduled transaction',
+			},
+			{
+				displayName: 'Account',
+				name: 'scheduledAccountId',
+				type: 'resourceLocator',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchAccounts',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select an account from the selected plan or enter an account ID',
+			},
+			{
+				displayName: 'Date',
+				name: 'scheduledDate',
+				type: 'string',
+				required: true,
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The scheduled transaction date in ISO format (YYYY-MM-DD)',
+			},
+			{
+				displayName: 'Amount',
+				name: 'scheduledAmount',
+				type: 'number',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: 0,
+				description: 'The scheduled transaction amount in milliunits format',
+			},
+			{
+				displayName: 'Payee ID',
+				name: 'scheduledPayeeId',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The ID of the payee',
+			},
+			{
+				displayName: 'Payee Name',
+				name: 'scheduledPayeeName',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'The payee name to use when payee ID is not provided',
+			},
+			{
+				displayName: 'Category',
+				name: 'scheduledCategoryId',
+				type: 'resourceLocator',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: {
+					mode: 'list',
+					value: '',
+				},
+				modes: [
+					{
+						displayName: 'From List',
+						name: 'list',
+						type: 'list',
+						typeOptions: {
+							searchListMethod: 'searchCategories',
+							searchable: true,
+							searchFilterRequired: false,
+						},
+					},
+					{
+						displayName: 'ID',
+						name: 'id',
+						type: 'string',
+						placeholder: 'e.g. 00000000-0000-0000-0000-000000000000',
+					},
+				],
+				description: 'Select a category from the selected plan or enter a category ID',
+			},
+			{
+				displayName: 'Memo',
+				name: 'scheduledMemo',
+				type: 'string',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				default: '',
+				description: 'Scheduled transaction memo',
+			},
+			{
+				displayName: 'Flag Color',
+				name: 'scheduledFlagColor',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				options: [
+					{ name: 'None', value: '' },
+					{ name: 'Red', value: 'red' },
+					{ name: 'Orange', value: 'orange' },
+					{ name: 'Yellow', value: 'yellow' },
+					{ name: 'Green', value: 'green' },
+					{ name: 'Blue', value: 'blue' },
+					{ name: 'Purple', value: 'purple' },
+				],
+				default: '',
+				description: 'Optional flag color for the scheduled transaction',
+			},
+			{
+				displayName: 'Frequency',
+				name: 'scheduledFrequency',
+				type: 'options',
+				displayOptions: {
+					show: {
+						resource: ['scheduledTransaction'],
+						operation: ['create', 'update'],
+					},
+				},
+				options: [
+					{ name: 'None', value: '' },
+					{ name: 'Never', value: 'never' },
+					{ name: 'Daily', value: 'daily' },
+					{ name: 'Weekly', value: 'weekly' },
+					{ name: 'Every Other Week', value: 'everyOtherWeek' },
+					{ name: 'Twice A Month', value: 'twiceAMonth' },
+					{ name: 'Every 4 Weeks', value: 'every4Weeks' },
+					{ name: 'Monthly', value: 'monthly' },
+					{ name: 'Every Other Month', value: 'everyOtherMonth' },
+					{ name: 'Every 3 Months', value: 'every3Months' },
+					{ name: 'Every 4 Months', value: 'every4Months' },
+					{ name: 'Twice A Year', value: 'twiceAYear' },
+					{ name: 'Yearly', value: 'yearly' },
+					{ name: 'Every Other Year', value: 'everyOtherYear' },
+				],
+				default: '',
+				description: 'Optional recurrence frequency for the scheduled transaction',
 			},
 
 			// User Operations
@@ -872,5 +2943,183 @@ export class Ynab implements INodeType {
 				default: 'get',
 			},
 		],
+	};
+
+	methods = {
+		listSearch: {
+			async searchPlans(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				const now = Date.now();
+				const plansCache = Ynab.locatorCache.plans;
+				let plans: Array<{ id: string; name: string }> = [];
+
+				if (plansCache && now - plansCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
+					plans = plansCache.items;
+				} else {
+					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+						url: 'https://api.ynab.com/v1/plans',
+						method: 'GET',
+						json: true,
+					})) as IDataObject;
+
+					plans = ((((response.data as IDataObject)?.plans as IDataObject[]) || [])
+						.filter((plan) => typeof plan.id === 'string')
+						.map((plan) => ({
+							id: String(plan.id),
+							name: String(plan.name || plan.id),
+						})));
+
+					Ynab.locatorCache.plans = {
+						fetchedAt: now,
+						items: plans,
+					};
+				}
+
+				const normalizedFilter = (filter || '').toLowerCase();
+
+				const results: INodeListSearchItems[] = plans
+					.filter((plan) => {
+						if (!normalizedFilter) return true;
+						const name = plan.name.toLowerCase();
+						const id = plan.id.toLowerCase();
+						return name.includes(normalizedFilter) || id.includes(normalizedFilter);
+					})
+					.map((plan) => ({
+						name: plan.name,
+						value: plan.id,
+					}));
+
+				return { results };
+			},
+			async searchAccounts(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				let planId = '';
+				try {
+					planId = Ynab.getLocatorValue(this.getNodeParameter('planId', ''));
+				} catch {
+					return { results: [] };
+				}
+
+				if (!planId) {
+					return { results: [] };
+				}
+
+				const now = Date.now();
+				const accountCache = Ynab.locatorCache.accountsByPlan[planId];
+				let accounts: Array<{ id: string; name: string }> = [];
+
+				if (accountCache && now - accountCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
+					accounts = accountCache.items;
+				} else {
+					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+						url: `https://api.ynab.com/v1/plans/${planId}/accounts`,
+						method: 'GET',
+						json: true,
+					})) as IDataObject;
+
+					accounts = ((((response.data as IDataObject)?.accounts as IDataObject[]) || [])
+						.filter((account) => typeof account.id === 'string')
+						.map((account) => ({
+							id: String(account.id),
+							name: String(account.name || account.id),
+						})));
+
+					Ynab.locatorCache.accountsByPlan[planId] = {
+						fetchedAt: now,
+						items: accounts,
+					};
+				}
+
+				const normalizedFilter = (filter || '').toLowerCase();
+
+				const results: INodeListSearchItems[] = accounts
+					.filter((account) => {
+						if (!normalizedFilter) return true;
+						const name = account.name.toLowerCase();
+						const id = account.id.toLowerCase();
+						return name.includes(normalizedFilter) || id.includes(normalizedFilter);
+					})
+					.map((account) => ({
+						name: account.name,
+						value: account.id,
+					}));
+
+				return { results };
+			},
+			async searchCategories(
+				this: ILoadOptionsFunctions,
+				filter?: string,
+			): Promise<INodeListSearchResult> {
+				let planId = '';
+				try {
+					planId = Ynab.getLocatorValue(this.getNodeParameter('planId', ''));
+				} catch {
+					return { results: [] };
+				}
+
+				if (!planId) {
+					return { results: [] };
+				}
+
+				const now = Date.now();
+				const categoryCache = Ynab.locatorCache.categoriesByPlan[planId];
+				let categories: Array<{ id: string; name: string }> = [];
+
+				if (categoryCache && now - categoryCache.fetchedAt < Ynab.LOCATOR_CACHE_TTL_MS) {
+					categories = categoryCache.items;
+				} else {
+					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+						url: `https://api.ynab.com/v1/plans/${planId}/categories`,
+						method: 'GET',
+						json: true,
+					})) as IDataObject;
+
+					const categoryGroups =
+						(((response.data as IDataObject)?.category_groups as IDataObject[]) || []).filter(
+							(group) => group && typeof group === 'object',
+						);
+
+					for (const group of categoryGroups) {
+						const groupName = String(group.name || '').trim();
+						const groupCategories = ((group.categories as IDataObject[]) || []).filter(
+							(category) => typeof category.id === 'string' && category.deleted !== true,
+						);
+
+						for (const category of groupCategories) {
+							const categoryName = String(category.name || category.id).trim();
+							categories.push({
+								id: String(category.id),
+								name: groupName ? `${groupName} / ${categoryName}` : categoryName,
+							});
+						}
+					}
+
+					Ynab.locatorCache.categoriesByPlan[planId] = {
+						fetchedAt: now,
+						items: categories,
+					};
+				}
+
+				const normalizedFilter = (filter || '').toLowerCase();
+				const results: INodeListSearchItems[] = categories
+					.filter((category) => {
+						if (!normalizedFilter) return true;
+						return (
+							category.name.toLowerCase().includes(normalizedFilter) ||
+							category.id.toLowerCase().includes(normalizedFilter)
+						);
+					})
+					.map((category) => ({
+						name: category.name,
+						value: category.id,
+					}));
+
+				return { results };
+			},
+		},
 	};
 }

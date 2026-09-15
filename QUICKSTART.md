@@ -17,12 +17,12 @@ Get up and running with the YNAB n8n node in minutes!
 
 ## 2. Install the Node
 
-### Option A: Via n8n Community Nodes (Coming Soon)
+### Option A: Via n8n Community Nodes
 
 1. Open n8n
 2. Go to **Settings** > **Community Nodes**
 3. Click **Install**
-4. Enter: `n8n-nodes-ynab`
+4. Enter: `n8n-nodes-ynab-npab19`
 5. Click **Install**
 
 ### Option B: Manual Installation
@@ -53,18 +53,18 @@ npm run build
 
 ## 4. Create Your First Workflow
 
-### Simple Example: List All Budgets
+### Simple Example: List All Plans
 
 1. Create a new workflow
 2. Add a **Manual Trigger** node
 3. Add a **YNAB** node
 4. Configure the YNAB node:
-   - **Resource**: Budget
+   - **Resource**: Plan
    - **Operation**: Get All
    - **Credentials**: Select your YNAB API credentials
 5. Connect the nodes
 6. Click **Test workflow**
-7. View your budgets in the output!
+7. View your plans in the output!
 
 ### Next Steps
 
@@ -77,7 +77,7 @@ Try these common operations:
 ## Need Help?
 
 - 📖 [Full Documentation](README.md)
-- 🐛 [Report Issues](https://github.com/YOUR_USERNAME/n8n-nodes-ynab/issues)
+- 🐛 [Report Issues](https://github.com/Npab19/n8n-nodes-ynab/issues)
 - 💬 [YNAB API Docs](https://api.ynab.com)
 - 🤝 [Contributing Guide](CONTRIBUTING.md)
 
@@ -85,7 +85,7 @@ Try these common operations:
 
 1. **Use AI Agent**: Combine with n8n's AI Agent for intelligent budget management
 2. **Milliunits**: YNAB amounts are in milliunits (10000 = $10.00)
-3. **Budget IDs**: Get budget IDs using "Get All Budgets" operation
+3. **Plan IDs**: Get plan IDs using "Get All Plans" operation
 4. **Test First**: Always test workflows with small amounts first
 
 Happy Automating! 🌳💰

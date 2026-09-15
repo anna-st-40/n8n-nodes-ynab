@@ -2,17 +2,21 @@
 
 ![YNAB Logo](https://cdn.prod.website-files.com/640f69143ec11b21d42015c6/6758a5396561162bbe65ae5c_524ab88af6960dd452642470297f8130_Tree%20Logo%20Blurple%20(2).svg)
 
-Custom n8n node for YNAB (You Need A Budget) API integration. This node allows you to interact with your YNAB budgets, accounts, transactions, categories, and payees directly from n8n workflows.
+Custom n8n node for YNAB (You Need A Budget) API integration. This node allows you to interact with your YNAB plans, accounts, categories, payees, payee locations, months, money movements, transactions, and scheduled transactions directly from n8n workflows.
 
 ## Features
 
-### Supported Resources
+### Supported Resources and Operations
 
-- **Budgets**: Get all budgets, get single budget, get budget settings
-- **Accounts**: Get all accounts, get single account, create account
-- **Transactions**: Get all, get single, create, update, delete transactions
-- **Categories**: Get all categories, get single category
-- **Payees**: Get all payees, get single payee
+- **Plans**: Get all, get by ID, get settings
+- **Accounts**: Get all, get by ID, create
+- **Categories**: Get all, get by ID, create, update, get month category, update month category, create group, update group
+- **Payees**: Get all, get by ID, create, update
+- **Payee Locations**: Get all, get by ID, filter by payee ID
+- **Months**: Get all, get by month
+- **Money Movements**: Get all movements, get all groups, optional month scoping
+- **Transactions**: Get all, get by ID, create, update, delete, update multiple, import
+- **Scheduled Transactions**: Get all, get by ID, create, update, delete
 - **User**: Get authenticated user information
 
 ### Authentication
@@ -96,12 +100,12 @@ npm run build
 3. Click **Test** to verify the connection
 4. Click **Save**
 
-### Example Workflow: Get All Budgets
+### Example Workflow: Get All Plans
 
 1. Add a "Manual Trigger" node
 2. Add a "YNAB" node
 3. Configure the YNAB node:
-   - **Resource**: Budget
+   - **Resource**: Plan
    - **Operation**: Get All
    - **Include Accounts**: true (optional)
 4. Connect the credentials
@@ -114,7 +118,7 @@ npm run build
 3. Configure the YNAB node:
    - **Resource**: Transaction
    - **Operation**: Create
-   - **Budget ID**: Your budget ID
+   - **Plan ID**: Your plan ID
    - **Account ID**: Your account ID
    - **Date**: Transaction date (YYYY-MM-DD)
    - **Amount**: Amount in milliunits (e.g., 10000 = $10.00)
@@ -145,7 +149,7 @@ npm run build
 ### Automation Examples
 - Auto-categorize recurring transactions
 - Send notifications when budgets are exceeded
-- Sync transactions between multiple budgets
+- Sync transactions between multiple plans
 - Generate monthly spending reports
 
 ## API Reference
@@ -226,7 +230,7 @@ This node is fully compatible with n8n's AI Agent (LangChain) and can be used as
    - "What categories am I overspending in?"
    - "Add a $100 payment to my credit card account"
 
-The AI agent can intelligently select the appropriate YNAB operations (get budgets, create transactions, etc.) based on natural language requests.
+The AI agent can intelligently select the appropriate YNAB operations (get plans, create transactions, etc.) based on natural language requests.
 
 ### AI Agent Workflow Example
 

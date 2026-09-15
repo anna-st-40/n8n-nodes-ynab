@@ -1,5 +1,5 @@
 {
-  "name": "YNAB Test - Get Budgets",
+  "name": "YNAB Test - Get Plans",
   "nodes": [
     {
       "parameters": {},
@@ -7,19 +7,25 @@
       "name": "Manual Trigger",
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
-      "position": [250, 300]
+      "position": [
+        250,
+        300
+      ]
     },
     {
       "parameters": {
-        "resource": "budget",
+        "resource": "plan",
         "operation": "getAll",
         "include_accounts": true
       },
       "id": "ynab-node",
-      "name": "YNAB - Get All Budgets",
+      "name": "YNAB - Get All Plans",
       "type": "n8n-nodes-ynab.ynab",
       "typeVersion": 1,
-      "position": [450, 300],
+      "position": [
+        450,
+        300
+      ],
       "credentials": {
         "ynabApi": {
           "id": "ynab-credentials",
@@ -33,7 +39,7 @@
       "main": [
         [
           {
-            "node": "YNAB - Get All Budgets",
+            "node": "YNAB - Get All Plans",
             "type": "main",
             "index": 0
           }
