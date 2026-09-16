@@ -7,6 +7,22 @@ updates:
     groups:
       minor-and-patch:
         update-types: ["minor", "patch"]
+    # The lint toolchain is owned by @n8n/node-cli, which pins its own
+    # typescript-eslint and eslint-plugin-n8n-nodes-base. Until it ships support
+    # for these majors, upgrading them breaks `n8n-node lint`. The usual escape
+    # hatch (a package.json "overrides" block) is itself rejected by the
+    # @n8n/community-nodes/no-overrides-field rule, so there is no local fix.
+    # Drop an entry here once @n8n/node-cli supports that major.
+    ignore:
+      # TypeScript 7 (the native port) no longer exposes the internal compiler
+      # API that ts-api-utils needs; no typescript-eslint release supports it
+      # yet (peer range is >=4.8.4 <6.1.0).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      # ESLint 10 removes context.getFilename() and changes the scope manager;
+      # eslint-plugin-n8n-nodes-base v1 (pinned by @n8n/node-cli) still uses both.
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
