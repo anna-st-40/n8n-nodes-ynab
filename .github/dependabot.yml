@@ -23,6 +23,13 @@ updates:
       # eslint-plugin-n8n-nodes-base v1 (pinned by @n8n/node-cli) still uses both.
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # release-it 20 swapped its argument parser for node:util parseArgs, which
+      # rejects both argument styles `n8n-node release` emits: the bare `-n` flag
+      # (dropped in favour of --ci) and single-argv pairs like
+      # '--git.requireBranch main'. `npm run release` dies at parse time on v20+.
+      # @n8n/node-cli's own templates pin ^19.0.4.
+      - dependency-name: "release-it"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
