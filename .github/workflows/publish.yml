@@ -34,7 +34,7 @@ jobs:
       id-token: write # required to mint the OIDC token for provenance
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Use Node.js
         uses: actions/setup-node@v4
