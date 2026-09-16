@@ -2,17 +2,18 @@
 # for community nodes. Provenance links the published tarball back to this
 # workflow run and commit, so npm can attest to where the package was built.
 #
-# Auth uses the NPM_TOKEN repository secret. The token needs write access to
-# this package; because the package does not exist yet, a granular token scoped
-# to specific packages cannot create it — scope it to all packages for the
-# first publish, or narrow it afterwards.
+# Auth uses npm trusted publishing (OIDC) — there is no NPM_TOKEN. npm exchanges
+# the short-lived OIDC token minted by the `id-token: write` permission below for
+# publish rights, so no long-lived credential is stored anywhere.
 #
-# Provenance still works with token auth: the `id-token: write` permission below
-# lets npm mint an OIDC attestation alongside the token-authenticated publish.
+# This works only because npmjs.com is configured to trust this exact repository
+# and workflow filename. Renaming this file, or moving it to another repo, breaks
+# publishing until the trusted publisher entry is updated to match at:
+#   https://www.npmjs.com/package/n8n-nodes-ynab-api/access
 #
-# To drop the token later, configure this repo and workflow as a trusted
-# publisher at https://www.npmjs.com/package/n8n-nodes-ynab-api/access and
-# remove the `env` block on the Release step.
+# Version 1.0.0 was published with a token because npm cannot configure a trusted
+# publisher for a package that does not exist yet (npm/cli#8544). That token has
+# served its purpose and should no longer exist.
 #
 # ─── RELEASE PROCESS ───────────────────────────────────────────────────────────
 #
@@ -73,5 +74,3 @@ jobs:
         # NPM_CONFIG_PROVENANCE=true. `prepublishOnly` (n8n-node prerelease)
         # blocks any publish that does not go through this path.
         run: npm run release
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
