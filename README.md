@@ -22,18 +22,22 @@ Follow the [installation guide](https://docs.n8n.io/integrations/community-nodes
 
 ## Operations
 
-The node covers every endpoint in YNAB API v1. Plans, accounts, categories, and payees use n8n resource locators, so you can search by name, pick from a list, or paste an ID.
+The node covers all 44 endpoints in YNAB API v1. Plans, accounts, and categories use n8n resource locators, so you can search by name, pick from a list, or paste an ID. Payees are plain ID or name fields.
 
-* **Plan**: Get all, Get, Get settings
-* **Account**: Get all, Get, Create
-* **Category**: Get all, Get, Create, Update, Get month category, Update month category, Create group, Update group
-* **Payee**: Get all, Get, Create, Update
-* **Payee Location**: Get all (optionally filtered to a single payee), Get
-* **Month**: Get all, Get
-* **Money Movement**: Get all movements, Get all groups (both optionally scoped to a month)
-* **Transaction**: Get all, Get, Create, Update, Delete, Update multiple, Import
-* **Scheduled Transaction**: Get all, Get, Create, Update, Delete
-* **User**: Get user info
+* **Plan**: Get Many, Get, Get Settings
+* **Account**: Get Many, Get, Create
+* **Category**: Get Many, Get, Create, Update, Get Month, Update Month, Create Group, Update Group
+* **Payee**: Get Many, Get, Create, Update
+* **Payee Location**: Get Many (optionally filtered to a single payee), Get
+* **Month**: Get Many, Get
+* **Money Movement**: Get Many, Get All Groups (both optionally scoped to a month)
+* **Transaction**: Get Many, Get, Create, Update, Delete, Update Multiple, Import
+* **Scheduled Transaction**: Get Many, Get, Create, Update, Delete
+* **User**: Get
+
+**Transaction** > **Get Many** takes a **Scope** option, so you can list transactions for the whole plan or narrow them to one account, category, payee, or month.
+
+List operations that support YNAB's delta requests expose **Last Knowledge of Server** under **Additional Fields**, so you can fetch only what changed since your last run.
 
 ## Credentials
 
@@ -50,7 +54,7 @@ The token grants full read and write access to every plan on the account. Revoke
 ## Compatibility
 
 * **n8n**: 1.110.1 or newer
-* **Node.js**: 20.19 or newer; CI builds and lints against Node.js 20.x and 22.x
+* **Node.js**: 20.19 or newer; CI builds and lints against the current Node.js LTS
 * **YNAB API**: v1
 
 ## Usage
@@ -65,7 +69,7 @@ YNAB represents money in milliunits: `10000` is $10.00, and outflows are negativ
 
 [examples/get-all-plans.json](examples/get-all-plans.json) is a ready-to-import workflow that lists your plans. Import it from **Workflows** > **Import from File**, then select your credentials.
 
-To create a transaction, set **Resource** to `Transaction` and **Operation** to `Create`, then pick the plan and account and fill in the date (`YYYY-MM-DD`), amount in milliunits, payee, and cleared status.
+To create a transaction, set **Resource** to `Transaction` and **Operation** to `Create`, then pick the plan and account and fill in **Date** (`YYYY-MM-DD`) and **Amount** in milliunits. **Payee Name**, **Memo**, and **Cleared** are optional.
 
 ### Using the node as an AI Agent tool
 
@@ -87,12 +91,12 @@ Because a Personal Access Token can write to your real budget, give agents that 
 
 ## Version history
 
-* **1.0.0** — First release under this package name. Full coverage of YNAB API v1, including money movements, category groups, payee locations, bulk transaction updates, and transaction import; resource locators for plans, accounts, categories, and payees; AI Agent tool support; and YNAB's current Plans terminology in place of Budgets.
+* **1.0.0** — First release under this package name. Full coverage of YNAB API v1, including money movements, category groups, payee locations, bulk transaction updates, and transaction import; resource locators for plans, accounts, and categories; AI Agent tool support; and YNAB's current Plans terminology in place of Budgets.
 
 ## License and attribution
 
 [MIT](LICENSE). Copyright (c) 2025 Nikko Pabion, Copyright (c) 2026 Anna Stefaniv Oickle.
 
-This project is a fork of [Npab19/n8n-nodes-YNAB](https://github.com/Npab19/n8n-nodes-YNAB) by Nikko Pabion, used under the MIT License. The fork brings the node up to full parity with the current YNAB API: it rewrites most of the node implementation, adds the remaining resources and operations, and converts the ID fields to resource locators.
+This project is a fork of [Npab19/n8n-nodes-YNAB](https://github.com/Npab19/n8n-nodes-YNAB) by Nikko Pabion, used under the MIT License. The fork brings the node up to full parity with the current YNAB API: it rewrites most of the node implementation, adds the remaining resources and operations, and converts the plan, account, and category ID fields to resource locators.
 
 See [NOTICE](NOTICE) for fork attribution and trademark information. This is an independent community integration and is not affiliated with, endorsed by, or sponsored by You Need A Budget LLC.

@@ -6,7 +6,7 @@ Get up and running with the YNAB n8n node in minutes!
 
 - n8n instance (Cloud or Self-Hosted)
 - YNAB account with API access
-- Node.js 18.17.0+ (for development)
+- Node.js 20.19+ (for development)
 
 ## 1. Get Your YNAB API Token
 
@@ -60,7 +60,7 @@ npm run build
 3. Add a **YNAB** node
 4. Configure the YNAB node:
    - **Resource**: Plan
-   - **Operation**: Get All
+   - **Operation**: Get Many
    - **Credentials**: Select your YNAB API credentials
 5. Connect the nodes
 6. Click **Test workflow**
@@ -70,9 +70,9 @@ npm run build
 
 Try these common operations:
 
-- **Get Account Balances**: Resource → Account, Operation → Get All
+- **Get Account Balances**: Resource → Account, Operation → Get Many
 - **Create Transaction**: Resource → Transaction, Operation → Create
-- **View Categories**: Resource → Category, Operation → Get All
+- **View Categories**: Resource → Category, Operation → Get Many
 
 ## Need Help?
 
@@ -85,7 +85,7 @@ Try these common operations:
 
 1. **Use AI Agent**: Combine with n8n's AI Agent for intelligent budget management
 2. **Milliunits**: YNAB amounts are in milliunits (10000 = $10.00)
-3. **Plan IDs**: Get plan IDs using "Get All Plans" operation
+3. **IDs**: Plans, accounts, and categories are resource locators — search or pick from a list instead of hunting for IDs
 4. **Test First**: Always test workflows with small amounts first
 
 Happy Automating! 🌳💰
