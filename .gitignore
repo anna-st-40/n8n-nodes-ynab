@@ -8,7 +8,11 @@ yarn-error.log*
 dist/
 
 # IDE
-.vscode/
+# Share the editor setup that every contributor benefits from, but keep
+# personal overrides (.vscode/settings.json and the like) out of the repo.
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
 .idea/
 *.swp
 *.swo

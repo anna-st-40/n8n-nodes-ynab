@@ -1,4 +1,4 @@
-<img src="nodes/Ynab/ynab.svg" alt="YNAB logo" width="96">
+<img src="icons/ynab.svg" alt="YNAB logo" width="96">
 
 # n8n-nodes-ynab-api
 

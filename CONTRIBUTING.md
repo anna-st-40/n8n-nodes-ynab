@@ -16,23 +16,17 @@ Thank you for your interest in contributing! This document provides guidelines f
    npm install
    ```
 
-4. Make your changes and build:
+4. Start the development server:
    ```bash
-   npm run build
+   npm run dev
    ```
 
-5. Test your changes with the Docker setup:
-   ```bash
-   docker-compose up -d
-   ```
+   This launches a local n8n with this node installed and rebuilds it on every
+   save, so you can drag the YNAB node onto a canvas and try your change
+   immediately. n8n data lives in `~/.n8n-node-cli`, separate from any n8n you
+   already run.
 
-   Or link the package into a local n8n instance instead:
-   ```bash
-   npm link
-   cd ~/.n8n/custom
-   npm link n8n-nodes-ynab-api
-   ```
-   Restart n8n after each `npm run build` to pick up the new `dist/`.
+   To build once without starting n8n, run `npm run build`.
 
 ## Project Layout
 
@@ -40,23 +34,43 @@ Thank you for your interest in contributing! This document provides guidelines f
 .
 ├── credentials/
 │   └── YnabApi.credentials.ts      # YNAB API credentials definition
+├── icons/
+│   ├── ynab.svg                    # Node and credential icon (light theme)
+│   └── ynab.dark.svg               # Dark theme variant
 ├── nodes/
 │   └── Ynab/
 │       ├── Ynab.node.ts            # Main node implementation
-│       ├── Ynab.node.json          # Node codex metadata
-│       └── ynab.svg                # Node icon
+│       └── Ynab.node.json          # Node codex metadata
 ├── examples/                       # Importable example workflows
 ├── dist/                           # Compiled JavaScript (generated)
+├── eslint.config.mjs               # Lint rules (n8n community node preset)
 ├── package.json                    # Node package configuration
 └── tsconfig.json                   # TypeScript configuration
 ```
+
+## Available Scripts
+
+| Script | What it does |
+| --- | --- |
+| `npm run dev` | Run n8n locally with this node, rebuilding on change |
+| `npm run build` | Compile TypeScript and copy icons and codex metadata into `dist/` |
+| `npm run build:watch` | Compile on change, without starting n8n |
+| `npm run lint` | Check the node against the n8n community node rules |
+| `npm run lint:fix` | Fix what the linter can fix automatically |
+| `npm run format` | Format sources with Prettier |
+| `npm run release` | Cut a release (maintainers only, see below) |
 
 ## Code Style
 
 - This project uses TypeScript
 - Run `npm run lint` before committing
-- Use `npm run lintfix` to automatically fix linting issues
+- Use `npm run lint:fix` to automatically fix linting issues
 - Follow the existing code style and patterns
+
+The linter runs in n8n's strict mode (`n8n.strict` in `package.json`), which
+checks the rules n8n applies when verifying a community node — naming, option
+ordering, icon variants, and deprecated API use. CI runs the same checks, so a
+clean `npm run lint` locally means a green build.
 
 ## Testing
 
@@ -84,6 +98,18 @@ When adding new YNAB API operations:
 3. Use the declarative-style routing pattern
 4. Add proper TypeScript types
 5. Test the operation end-to-end
+
+## Releasing (maintainers)
+
+```bash
+npm run release
+```
+
+This lints, builds, prompts for the version bump, updates `CHANGELOG.md`, then
+commits, tags, and pushes. Pushing the tag triggers the publish workflow, which
+publishes to npm with a provenance attestation — n8n requires community nodes to
+be published this way. Do not run `npm publish` by hand; `prepublishOnly` blocks
+it, because a manual publish produces no provenance.
 
 ## Code of Conduct
 

@@ -7,12 +7,9 @@ import {
 	INodeTypeDescription,
 	INodeListSearchItems,
 	INodeListSearchResult,
-	INodeExecutionData,
-	IExecuteFunctions,
 	IExecuteSingleFunctions,
 	ILoadOptionsFunctions,
 	IDataObject,
-	IHttpRequestMethods,
 	IHttpRequestOptions,
 } from 'n8n-workflow';
 
@@ -105,7 +102,7 @@ export class Ynab implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'YNAB',
 		name: 'ynab',
-		icon: 'file:ynab.svg',
+		icon: { light: 'file:../../icons/ynab.svg', dark: 'file:../../icons/ynab.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
@@ -137,16 +134,20 @@ export class Ynab implements INodeType {
 				noDataExpression: true,
 				options: [
 					{
-						name: 'Plan',
-						value: 'plan',
-					},
-					{
 						name: 'Account',
 						value: 'account',
 					},
 					{
 						name: 'Category',
 						value: 'category',
+					},
+					{
+						name: 'Money Movement',
+						value: 'moneyMovement',
+					},
+					{
+						name: 'Month',
+						value: 'month',
 					},
 					{
 						name: 'Payee',
@@ -157,20 +158,16 @@ export class Ynab implements INodeType {
 						value: 'payeeLocation',
 					},
 					{
-						name: 'Month',
-						value: 'month',
-					},
-					{
-						name: 'Money Movement',
-						value: 'moneyMovement',
-					},
-					{
-						name: 'Transaction',
-						value: 'transaction',
+						name: 'Plan',
+						value: 'plan',
 					},
 					{
 						name: 'Scheduled Transaction',
 						value: 'scheduledTransaction',
+					},
+					{
+						name: 'Transaction',
+						value: 'transaction',
 					},
 					{
 						name: 'User',
@@ -193,10 +190,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all plans',
-						action: 'Get all plans',
+						description: 'Get many plans',
+						action: 'Get many plans',
 						routing: {
 							request: {
 								method: 'GET',
@@ -326,7 +323,7 @@ export class Ynab implements INodeType {
 						operation: ['get'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Field',
 				options: [
 					{
@@ -360,10 +357,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all accounts for a plan',
-						action: 'Get all accounts',
+						description: 'Get many accounts for a plan',
+						action: 'Get many accounts',
 						routing: {
 							request: {
 								method: 'GET',
@@ -494,7 +491,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Field',
 				options: [
 					{
@@ -575,13 +572,13 @@ export class Ynab implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'Checking', value: 'checking' },
-					{ name: 'Savings', value: 'savings' },
-					{ name: 'Credit Card', value: 'creditCard' },
 					{ name: 'Cash', value: 'cash' },
+					{ name: 'Checking', value: 'checking' },
+					{ name: 'Credit Card', value: 'creditCard' },
 					{ name: 'Line of Credit', value: 'lineOfCredit' },
 					{ name: 'Other Asset', value: 'otherAsset' },
 					{ name: 'Other Liability', value: 'otherLiability' },
+					{ name: 'Savings', value: 'savings' },
 				],
 				default: 'checking',
 				description: 'The type of account',
@@ -614,10 +611,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all transactions',
-						action: 'Get all transactions',
+						description: 'Get many transactions',
+						action: 'Get many transactions',
 						routing: {
 							request: {
 								method: 'GET',
@@ -926,11 +923,6 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Plan',
-						value: 'plan',
-						description: 'Return all plan transactions',
-					},
-					{
 						name: 'Account',
 						value: 'account',
 						description: 'Return transactions for a single account',
@@ -941,14 +933,19 @@ export class Ynab implements INodeType {
 						description: 'Return transactions for a single category',
 					},
 					{
+						name: 'Month',
+						value: 'month',
+						description: 'Return transactions for a specific month',
+					},
+					{
 						name: 'Payee',
 						value: 'payee',
 						description: 'Return transactions for a single payee',
 					},
 					{
-						name: 'Month',
-						value: 'month',
-						description: 'Return transactions for a specific month',
+						name: 'Plan',
+						value: 'plan',
+						description: 'Return all plan transactions',
 					},
 				],
 				default: 'plan',
@@ -1067,7 +1064,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Field',
 				options: [
 					{
@@ -1132,7 +1129,7 @@ export class Ynab implements INodeType {
 					},
 				},
 				default: '[]',
-				placeholder: '[{"id":"...","amount":12345}]',
+				placeholder: '[{"ID":"...","amount":12345}]',
 				description: 'JSON array of transaction updates',
 			},
 			{
@@ -1270,10 +1267,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all categories',
-						action: 'Get all categories',
+						description: 'Get many categories',
+						action: 'Get many categories',
 						routing: {
 							request: {
 								method: 'GET',
@@ -1637,7 +1634,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Field',
 				options: [
 					{
@@ -1826,10 +1823,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all payees',
-						action: 'Get all payees',
+						description: 'Get many payees',
+						action: 'Get many payees',
 						routing: {
 							request: {
 								method: 'GET',
@@ -2001,7 +1998,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Field',
 				options: [
 					{
@@ -2062,10 +2059,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all plan months',
-						action: 'Get all plan months',
+						description: 'Get many plan months',
+						action: 'Get many plan months',
 						routing: {
 							request: {
 								method: 'GET',
@@ -2152,7 +2149,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Field',
 				options: [
 					{
@@ -2200,10 +2197,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all payee locations',
-						action: 'Get all payee locations',
+						description: 'Get many payee locations',
+						action: 'Get many payee locations',
 						routing: {
 							request: {
 								method: 'GET',
@@ -2304,7 +2301,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Filter',
 				options: [
 					{
@@ -2330,10 +2327,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all money movements',
-						action: 'Get all money movements',
+						description: 'Get many money movements',
+						action: 'Get many money movements',
 						routing: {
 							request: {
 								method: 'GET',
@@ -2420,7 +2417,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll', 'getGroups'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Filter',
 				options: [
 					{
@@ -2447,10 +2444,10 @@ export class Ynab implements INodeType {
 				},
 				options: [
 					{
-						name: 'Get All',
+						name: 'Get Many',
 						value: 'getAll',
-						description: 'Get all scheduled transactions',
-						action: 'Get all scheduled transactions',
+						description: 'Get many scheduled transactions',
+						action: 'Get many scheduled transactions',
 						routing: {
 							request: {
 								method: 'GET',
@@ -2747,7 +2744,7 @@ export class Ynab implements INodeType {
 						operation: ['getAll'],
 					},
 				},
-				default: '',
+				default: {},
 				placeholder: 'Add Field',
 				options: [
 					{
@@ -2927,13 +2924,13 @@ export class Ynab implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'None', value: '' },
-					{ name: 'Red', value: 'red' },
-					{ name: 'Orange', value: 'orange' },
-					{ name: 'Yellow', value: 'yellow' },
-					{ name: 'Green', value: 'green' },
 					{ name: 'Blue', value: 'blue' },
+					{ name: 'Green', value: 'green' },
+					{ name: 'None', value: '' },
+					{ name: 'Orange', value: 'orange' },
 					{ name: 'Purple', value: 'purple' },
+					{ name: 'Red', value: 'red' },
+					{ name: 'Yellow', value: 'yellow' },
 				],
 				default: '',
 				description: 'Optional flag color for the scheduled transaction',
@@ -2949,20 +2946,20 @@ export class Ynab implements INodeType {
 					},
 				},
 				options: [
-					{ name: 'None', value: '' },
-					{ name: 'Never', value: 'never' },
 					{ name: 'Daily', value: 'daily' },
-					{ name: 'Weekly', value: 'weekly' },
-					{ name: 'Every Other Week', value: 'everyOtherWeek' },
-					{ name: 'Twice A Month', value: 'twiceAMonth' },
-					{ name: 'Every 4 Weeks', value: 'every4Weeks' },
-					{ name: 'Monthly', value: 'monthly' },
-					{ name: 'Every Other Month', value: 'everyOtherMonth' },
 					{ name: 'Every 3 Months', value: 'every3Months' },
 					{ name: 'Every 4 Months', value: 'every4Months' },
-					{ name: 'Twice A Year', value: 'twiceAYear' },
-					{ name: 'Yearly', value: 'yearly' },
+					{ name: 'Every 4 Weeks', value: 'every4Weeks' },
+					{ name: 'Every Other Month', value: 'everyOtherMonth' },
+					{ name: 'Every Other Week', value: 'everyOtherWeek' },
 					{ name: 'Every Other Year', value: 'everyOtherYear' },
+					{ name: 'Monthly', value: 'monthly' },
+					{ name: 'Never', value: 'never' },
+					{ name: 'None', value: '' },
+					{ name: 'Twice A Month', value: 'twiceAMonth' },
+					{ name: 'Twice A Year', value: 'twiceAYear' },
+					{ name: 'Weekly', value: 'weekly' },
+					{ name: 'Yearly', value: 'yearly' },
 				],
 				default: '',
 				description: 'Optional recurrence frequency for the scheduled transaction',
@@ -3019,7 +3016,7 @@ export class Ynab implements INodeType {
 				let plans = Ynab.readLocatorCache(cacheKey);
 
 				if (!plans) {
-					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+					const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'ynabApi', {
 						url: 'https://api.ynab.com/v1/plans',
 						method: 'GET',
 						json: true,
@@ -3071,7 +3068,7 @@ export class Ynab implements INodeType {
 				let accounts = Ynab.readLocatorCache(cacheKey);
 
 				if (!accounts) {
-					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+					const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'ynabApi', {
 						url: `https://api.ynab.com/v1/plans/${planId}/accounts`,
 						method: 'GET',
 						json: true,
@@ -3123,7 +3120,7 @@ export class Ynab implements INodeType {
 				let categories = Ynab.readLocatorCache(cacheKey);
 
 				if (!categories) {
-					const response = (await this.helpers.requestWithAuthentication.call(this, 'ynabApi', {
+					const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'ynabApi', {
 						url: `https://api.ynab.com/v1/plans/${planId}/categories`,
 						method: 'GET',
 						json: true,

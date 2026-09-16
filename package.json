@@ -31,18 +31,23 @@
     "node": ">=20.19"
   },
   "scripts": {
-    "build": "tsc && gulp build:icons",
-    "dev": "tsc --watch",
+    "build": "n8n-node build",
+    "build:watch": "tsc --watch",
+    "dev": "n8n-node dev",
     "format": "prettier nodes credentials --write",
-    "lint": "eslint nodes/**/*.ts credentials/**/*.ts package.json",
-    "lintfix": "eslint nodes/**/*.ts credentials/**/*.ts package.json --fix",
-    "prepublishOnly": "npm run build && npm run lint"
+    "lint": "n8n-node lint",
+    "lint:fix": "n8n-node lint --fix",
+    "release": "n8n-node release",
+    "prepublishOnly": "n8n-node prerelease"
   },
   "files": [
-    "dist"
+    "dist",
+    "!dist/tsconfig.tsbuildinfo",
+    "NOTICE"
   ],
   "n8n": {
     "n8nNodesApiVersion": 1,
+    "strict": true,
     "credentials": [
       "dist/credentials/YnabApi.credentials.js"
     ],
@@ -52,13 +57,11 @@
   },
   "devDependencies": {
     "@n8n/node-cli": "^0.48.3",
-    "@typescript-eslint/parser": "^7.15.0",
-    "eslint": "^8.56.0",
-    "eslint-plugin-n8n-nodes-base": "^1.16.1",
-    "gulp": "^5.0.1",
+    "eslint": "^9.39.4",
     "n8n-workflow": "^2.16.0",
-    "prettier": "^3.3.2",
-    "typescript": "^5.5.3"
+    "prettier": "^3.8.3",
+    "release-it": "^20.2.0",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "n8n-workflow": "*"

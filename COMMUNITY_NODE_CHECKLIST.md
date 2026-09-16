@@ -29,10 +29,12 @@ Date: 2026-09-15
 ## ✅ Code Quality Standards
 
 ### 6. Code Standards
-- [x] **ESLint**: Configured and passing
+- [x] **ESLint**: n8n community node preset via `@n8n/node-cli`, flat config
+- [x] **Strict mode**: `n8n.strict` enabled in `package.json`
 - [x] **Prettier**: Code formatting configured
 - [x] **No linting errors**: `npm run lint` passes
 - [x] **Builds successfully**: `npm run build` works
+- [x] **Published with provenance**: via GitHub Actions on tag push
 
 ### 7. Node Implementation
 - [x] **Declarative style**: Used for REST API
@@ -49,7 +51,9 @@ Date: 2026-09-15
 - [x] **Documentation URL**: Included in credentials
 
 ### 9. Icon/Branding
-- [x] **Icon file**: `ynab.svg` present (official YNAB logo)
+- [x] **Icon file**: `icons/ynab.svg` present (official YNAB logo)
+- [x] **Dark theme variant**: `icons/ynab.dark.svg` present
+- [x] **Shared by node and credential**: Both reference the same files
 - [x] **Proper format**: SVG format
 - [x] **Size**: 4.7KB (good size)
 

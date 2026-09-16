@@ -1,5 +1,6 @@
 import {
 	IAuthenticateGeneric,
+	Icon,
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
@@ -8,6 +9,7 @@ import {
 export class YnabApi implements ICredentialType {
 	name = 'ynabApi';
 	displayName = 'YNAB API';
+	icon: Icon = { light: 'file:../icons/ynab.svg', dark: 'file:../icons/ynab.dark.svg' };
 	documentationUrl = 'https://api.ynab.com';
 	properties: INodeProperties[] = [
 		{
