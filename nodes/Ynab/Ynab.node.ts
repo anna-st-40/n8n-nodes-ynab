@@ -11,6 +11,7 @@ import {
 	ILoadOptionsFunctions,
 	IDataObject,
 	IHttpRequestOptions,
+	INodeExecutionData,
 } from 'n8n-workflow';
 
 type LocatorItem = { id: string; name: string };
@@ -38,6 +39,36 @@ export class Ynab implements INodeType {
 	}
 
 	private static locatorCache = new Map<string, LocatorCacheEntry>();
+
+	/**
+	 * Builds the postReceive step for operations that support YNAB delta requests.
+	 *
+	 * By default it unwraps `data.<key>` like a plain rootProperty step. When the
+	 * user enables "Include Server Knowledge", it instead returns YNAB's `data`
+	 * object as a single item (e.g. `{ accounts: [...], server_knowledge: 123 }`),
+	 * so the new server_knowledge value can be stored and passed to the next run.
+	 */
+	private static deltaOutput(key: string) {
+		return async function (
+			this: IExecuteSingleFunctions,
+			items: INodeExecutionData[],
+		): Promise<INodeExecutionData[]> {
+			const includeServerKnowledge = this.getNodeParameter(
+				'additionalFields.includeServerKnowledge',
+				false,
+			) as boolean;
+
+			return items.flatMap((item) => {
+				const data = ((item.json as IDataObject).data ?? {}) as IDataObject;
+				if (includeServerKnowledge) return [{ json: data }];
+
+				const content = data[key];
+				if (content === undefined || content === null) return [];
+				const list = Array.isArray(content) ? content : [content];
+				return list.map((json) => ({ json: json as IDataObject }));
+			});
+		};
+	}
 
 	/**
 	 * Builds the cache-key prefix for the credential currently in use.
@@ -222,14 +253,7 @@ export class Ynab implements INodeType {
 								url: '=/plans/{{$parameter.planId}}',
 							},
 							output: {
-								postReceive: [
-									{
-										type: 'rootProperty',
-										properties: {
-											property: 'data.plan',
-										},
-									},
-								],
+								postReceive: [Ynab.deltaOutput('plan')],
 							},
 						},
 					},
@@ -341,6 +365,14 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						displayName: 'Include Server Knowledge',
+						name: 'includeServerKnowledge',
+						type: 'boolean',
+						default: false,
+						description:
+							"Whether to return YNAB's full response data as a single item, including server_knowledge, instead of one item per entity. Store server_knowledge and pass it as Last Knowledge of Server on the next run to fetch only changes.",
+					},
 				],
 			},
 
@@ -367,14 +399,7 @@ export class Ynab implements INodeType {
 								url: '=/plans/{{$parameter.planId}}/accounts',
 							},
 							output: {
-								postReceive: [
-									{
-										type: 'rootProperty',
-										properties: {
-											property: 'data.accounts',
-										},
-									},
-								],
+								postReceive: [Ynab.deltaOutput('accounts')],
 							},
 						},
 					},
@@ -509,6 +534,14 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						displayName: 'Include Server Knowledge',
+						name: 'includeServerKnowledge',
+						type: 'boolean',
+						default: false,
+						description:
+							"Whether to return YNAB's full response data as a single item, including server_knowledge, instead of one item per entity. Store server_knowledge and pass it as Last Knowledge of Server on the next run to fetch only changes.",
+					},
 				],
 			},
 			{
@@ -621,14 +654,7 @@ export class Ynab implements INodeType {
 								url: '={{(() => { const planPath = "/plans/" + $parameter.planId; switch ($parameter.transactionListScope || "plan") { case "account": return planPath + "/accounts/" + $parameter.transactionAccountId + "/transactions"; case "category": return planPath + "/categories/" + $parameter.transactionCategoryId + "/transactions"; case "payee": return planPath + "/payees/" + $parameter.transactionPayeeId + "/transactions"; case "month": return planPath + "/months/" + $parameter.transactionMonth + "/transactions"; default: return planPath + "/transactions"; } })() }}',
 							},
 							output: {
-								postReceive: [
-									{
-										type: 'rootProperty',
-										properties: {
-											property: 'data.transactions',
-										},
-									},
-								],
+								postReceive: [Ynab.deltaOutput('transactions')],
 							},
 						},
 					},
@@ -672,9 +698,7 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
-										const payeeName = (
-											this.getNodeParameter('payeeName') as string
-										).trim();
+										const payeeName = (this.getNodeParameter('payeeName') as string).trim();
 										const memo = (this.getNodeParameter('memo') as string).trim();
 
 										const transaction: IDataObject = {
@@ -732,9 +756,7 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
-										const payeeName = (
-											this.getNodeParameter('payeeName') as string
-										).trim();
+										const payeeName = (this.getNodeParameter('payeeName') as string).trim();
 										const memo = (this.getNodeParameter('memo') as string).trim();
 
 										const transaction: IDataObject = {
@@ -826,11 +848,17 @@ export class Ynab implements INodeType {
 										try {
 											transactions = JSON.parse(rawTransactions) as IDataObject[];
 										} catch {
-											throw new NodeOperationError(this.getNode(), 'Invalid JSON supplied for transactions');
+											throw new NodeOperationError(
+												this.getNode(),
+												'Invalid JSON supplied for transactions',
+											);
 										}
 
 										if (!Array.isArray(transactions)) {
-											throw new NodeOperationError(this.getNode(), 'Transactions must be a JSON array');
+											throw new NodeOperationError(
+												this.getNode(),
+												'Transactions must be a JSON array',
+											);
 										}
 
 										return {
@@ -1083,12 +1111,19 @@ export class Ynab implements INodeType {
 						},
 					},
 					{
+						displayName: 'Include Server Knowledge',
+						name: 'includeServerKnowledge',
+						type: 'boolean',
+						default: false,
+						description:
+							"Whether to return YNAB's full response data as a single item, including server_knowledge, instead of one item per entity. Store server_knowledge and pass it as Last Knowledge of Server on the next run to fetch only changes.",
+					},
+					{
 						displayName: 'Since Date',
 						name: 'sinceDate',
 						type: 'string',
 						default: '',
-						description:
-							'Only transactions on or after this ISO date (YYYY-MM-DD) are returned',
+						description: 'Only transactions on or after this ISO date (YYYY-MM-DD) are returned',
 						routing: {
 							request: {
 								qs: {
@@ -1277,14 +1312,7 @@ export class Ynab implements INodeType {
 								url: '=/plans/{{$parameter.planId}}/categories',
 							},
 							output: {
-								postReceive: [
-									{
-										type: 'rootProperty',
-										properties: {
-											property: 'data.category_groups',
-										},
-									},
-								],
+								postReceive: [Ynab.deltaOutput('category_groups')],
 							},
 						},
 					},
@@ -1338,7 +1366,10 @@ export class Ynab implements INodeType {
 										}
 
 										if (!parentCategoryGroupId) {
-											throw new NodeOperationError(this.getNode(), 'Parent category group ID is required');
+											throw new NodeOperationError(
+												this.getNode(),
+												'Parent category group ID is required',
+											);
 										}
 
 										const category: IDataObject = {
@@ -1356,7 +1387,9 @@ export class Ynab implements INodeType {
 											category.goal_target = goalTarget;
 										}
 
-										const goalTargetDate = String(this.getNodeParameter('goalTargetDate') || '').trim();
+										const goalTargetDate = String(
+											this.getNodeParameter('goalTargetDate') || '',
+										).trim();
 										if (goalTargetDate) {
 											category.goal_target_date = goalTargetDate;
 										}
@@ -1422,7 +1455,9 @@ export class Ynab implements INodeType {
 											category.goal_target = goalTarget;
 										}
 
-										const goalTargetDate = String(this.getNodeParameter('goalTargetDate') || '').trim();
+										const goalTargetDate = String(
+											this.getNodeParameter('goalTargetDate') || '',
+										).trim();
 										if (goalTargetDate) {
 											category.goal_target_date = goalTargetDate;
 										}
@@ -1527,9 +1562,14 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
-										const categoryGroupName = String(this.getNodeParameter('categoryGroupName') || '').trim();
+										const categoryGroupName = String(
+											this.getNodeParameter('categoryGroupName') || '',
+										).trim();
 										if (!categoryGroupName) {
-											throw new NodeOperationError(this.getNode(), 'Category group name is required');
+											throw new NodeOperationError(
+												this.getNode(),
+												'Category group name is required',
+											);
 										}
 										return {
 											...requestOptions,
@@ -1566,9 +1606,14 @@ export class Ynab implements INodeType {
 										this: IExecuteSingleFunctions,
 										requestOptions: IHttpRequestOptions,
 									): Promise<IHttpRequestOptions> {
-										const categoryGroupName = String(this.getNodeParameter('categoryGroupName') || '').trim();
+										const categoryGroupName = String(
+											this.getNodeParameter('categoryGroupName') || '',
+										).trim();
 										if (!categoryGroupName) {
-											throw new NodeOperationError(this.getNode(), 'Category group name is required');
+											throw new NodeOperationError(
+												this.getNode(),
+												'Category group name is required',
+											);
 										}
 										return {
 											...requestOptions,
@@ -1651,6 +1696,14 @@ export class Ynab implements INodeType {
 								},
 							},
 						},
+					},
+					{
+						displayName: 'Include Server Knowledge',
+						name: 'includeServerKnowledge',
+						type: 'boolean',
+						default: false,
+						description:
+							"Whether to return YNAB's full response data as a single item, including server_knowledge, instead of one item per entity. Store server_knowledge and pass it as Last Knowledge of Server on the next run to fetch only changes.",
 					},
 				],
 			},
@@ -1833,14 +1886,7 @@ export class Ynab implements INodeType {
 								url: '=/plans/{{$parameter.planId}}/payees',
 							},
 							output: {
-								postReceive: [
-									{
-										type: 'rootProperty',
-										properties: {
-											property: 'data.payees',
-										},
-									},
-								],
+								postReceive: [Ynab.deltaOutput('payees')],
 							},
 						},
 					},
@@ -2016,6 +2062,14 @@ export class Ynab implements INodeType {
 							},
 						},
 					},
+					{
+						displayName: 'Include Server Knowledge',
+						name: 'includeServerKnowledge',
+						type: 'boolean',
+						default: false,
+						description:
+							"Whether to return YNAB's full response data as a single item, including server_knowledge, instead of one item per entity. Store server_knowledge and pass it as Last Knowledge of Server on the next run to fetch only changes.",
+					},
 				],
 			},
 			{
@@ -2069,14 +2123,7 @@ export class Ynab implements INodeType {
 								url: '=/plans/{{$parameter.planId}}/months',
 							},
 							output: {
-								postReceive: [
-									{
-										type: 'rootProperty',
-										properties: {
-											property: 'data.months',
-										},
-									},
-								],
+								postReceive: [Ynab.deltaOutput('months')],
 							},
 						},
 					},
@@ -2166,6 +2213,14 @@ export class Ynab implements INodeType {
 								},
 							},
 						},
+					},
+					{
+						displayName: 'Include Server Knowledge',
+						name: 'includeServerKnowledge',
+						type: 'boolean',
+						default: false,
+						description:
+							"Whether to return YNAB's full response data as a single item, including server_knowledge, instead of one item per entity. Store server_knowledge and pass it as Last Knowledge of Server on the next run to fetch only changes.",
 					},
 				],
 			},
@@ -2425,7 +2480,8 @@ export class Ynab implements INodeType {
 						name: 'month',
 						type: 'string',
 						default: '',
-						description: 'If provided, only data for this month (YYYY-MM-DD or current) is returned',
+						description:
+							'If provided, only data for this month (YYYY-MM-DD or current) is returned',
 					},
 				],
 				description: 'Optional filters for money movement queries',
@@ -2454,14 +2510,7 @@ export class Ynab implements INodeType {
 								url: '=/plans/{{$parameter.planId}}/scheduled_transactions',
 							},
 							output: {
-								postReceive: [
-									{
-										type: 'rootProperty',
-										properties: {
-											property: 'data.scheduled_transactions',
-										},
-									},
-								],
+								postReceive: [Ynab.deltaOutput('scheduled_transactions')],
 							},
 						},
 					},
@@ -2528,9 +2577,7 @@ export class Ynab implements INodeType {
 										const scheduledCategoryId = String(
 											this.getNodeParameter('scheduledCategoryId', ''),
 										).trim();
-										const scheduledMemo = String(
-											this.getNodeParameter('scheduledMemo', ''),
-										).trim();
+										const scheduledMemo = String(this.getNodeParameter('scheduledMemo', '')).trim();
 										const scheduledFlagColor = String(
 											this.getNodeParameter('scheduledFlagColor', ''),
 										).trim();
@@ -2623,9 +2670,7 @@ export class Ynab implements INodeType {
 										const scheduledCategoryId = String(
 											this.getNodeParameter('scheduledCategoryId', ''),
 										).trim();
-										const scheduledMemo = String(
-											this.getNodeParameter('scheduledMemo', ''),
-										).trim();
+										const scheduledMemo = String(this.getNodeParameter('scheduledMemo', '')).trim();
 										const scheduledFlagColor = String(
 											this.getNodeParameter('scheduledFlagColor', ''),
 										).trim();
@@ -2761,6 +2806,14 @@ export class Ynab implements INodeType {
 								},
 							},
 						},
+					},
+					{
+						displayName: 'Include Server Knowledge',
+						name: 'includeServerKnowledge',
+						type: 'boolean',
+						default: false,
+						description:
+							"Whether to return YNAB's full response data as a single item, including server_knowledge, instead of one item per entity. Store server_knowledge and pass it as Last Knowledge of Server on the next run to fetch only changes.",
 					},
 				],
 			},
@@ -3022,12 +3075,12 @@ export class Ynab implements INodeType {
 						json: true,
 					})) as IDataObject;
 
-					plans = ((((response.data as IDataObject)?.plans as IDataObject[]) || [])
+					plans = (((response.data as IDataObject)?.plans as IDataObject[]) || [])
 						.filter((plan) => typeof plan.id === 'string')
 						.map((plan) => ({
 							id: String(plan.id),
 							name: String(plan.name || plan.id),
-						})));
+						}));
 
 					Ynab.writeLocatorCache(cacheKey, plans);
 				}
@@ -3074,12 +3127,12 @@ export class Ynab implements INodeType {
 						json: true,
 					})) as IDataObject;
 
-					accounts = ((((response.data as IDataObject)?.accounts as IDataObject[]) || [])
+					accounts = (((response.data as IDataObject)?.accounts as IDataObject[]) || [])
 						.filter((account) => typeof account.id === 'string')
 						.map((account) => ({
 							id: String(account.id),
 							name: String(account.name || account.id),
-						})));
+						}));
 
 					Ynab.writeLocatorCache(cacheKey, accounts);
 				}
@@ -3126,10 +3179,9 @@ export class Ynab implements INodeType {
 						json: true,
 					})) as IDataObject;
 
-					const categoryGroups =
-						(((response.data as IDataObject)?.category_groups as IDataObject[]) || []).filter(
-							(group) => group && typeof group === 'object',
-						);
+					const categoryGroups = (
+						((response.data as IDataObject)?.category_groups as IDataObject[]) || []
+					).filter((group) => group && typeof group === 'object');
 
 					const collected: LocatorItem[] = [];
 

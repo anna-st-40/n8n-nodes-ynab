@@ -37,7 +37,10 @@ The node covers all 44 endpoints in YNAB API v1. Plans, accounts, and categories
 
 **Transaction** > **Get Many** takes a **Scope** option, so you can list transactions for the whole plan or narrow them to one account, category, payee, or month.
 
-List operations that support YNAB's delta requests expose **Last Knowledge of Server** under **Additional Fields**, so you can fetch only what changed since your last run.
+Operations that support YNAB's delta requests (Plan > Get, and Get Many for Accounts, Transactions, Categories, Payees, Months, and Scheduled Transactions) expose two options under **Additional Fields**, so you can fetch only what changed since your last run:
+
+* **Include Server Knowledge**: returns YNAB's response data as a single item instead of one item per entity, for example `{ "transactions": [...], "server_knowledge": 1234 }`. Store `server_knowledge` for the next run.
+* **Last Knowledge of Server**: the `server_knowledge` value from a previous run. YNAB then returns only the entities that changed since then.
 
 ## Credentials
 
